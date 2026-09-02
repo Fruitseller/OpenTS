@@ -403,7 +403,7 @@ test('A resume is judged before it is loaded, and the save answers for the rest'
 	assertOrdered(functionBody(source('code/spawner.cpp'), 'static bool Spawner_Resume(bool & gameloaded)'), [
 		'SpawnConfig.SaveGameName.empty()',
 		'Get_Savefile_Info(SpawnConfig.SaveGameName.c_str(), &info)',
-		'info.Get_Internal_Version() != ExpectedGameVersion',
+		'!info.Is_Compatible(ExpectedGameVersion)',
 		'type == GAME_IPX',
 		'SpawnConfig.Is_Playable(HouseTypes.Count(), MAX_MPLAYER_COLORS, fault)',
 		'Spawner_Seat_Humans();',

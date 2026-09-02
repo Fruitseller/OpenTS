@@ -42,6 +42,8 @@ constexpr std::size_t FrameDelayOffset = DataOffset + offsetof(decltype(std::dec
 constexpr std::size_t VariableSizeOffset = offsetof(VariableDataType, Size);
 constexpr std::size_t MegaWhomSize = sizeof(std::declval<EventClass>().Data.MegaMission.Whom);
 
+static_assert(sizeof(EventClass) == 46);
+
 int Failures = 0;
 
 

@@ -381,8 +381,8 @@ static bool Spawner_Resume(bool & gameloaded)
 		return(Spawner_Refuse("The saved game %s is missing or unreadable.", SpawnConfig.SaveGameName.c_str()));
 	}
 
-	if (info.Get_Internal_Version() != ExpectedGameVersion) {
-		return(Spawner_Refuse("The saved game was made by another version of the game."));
+	if (!info.Is_Compatible(ExpectedGameVersion)) {
+		return(Spawner_Refuse("The saved game is incompatible with this build."));
 	}
 
 	// A client never arranges a local network game, so no launch file describes one.

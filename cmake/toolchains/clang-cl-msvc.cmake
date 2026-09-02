@@ -1,5 +1,19 @@
 set(CMAKE_SYSTEM_NAME Windows)
-set(CMAKE_SYSTEM_PROCESSOR x86)
+
+set(OPENTS_WINDOWS_ARCH "x86" CACHE STRING "Windows target architecture (x86 or x64)")
+set_property(CACHE OPENTS_WINDOWS_ARCH PROPERTY STRINGS x86 x64)
+
+if(OPENTS_WINDOWS_ARCH STREQUAL "x86")
+    set(CMAKE_SYSTEM_PROCESSOR x86)
+    set(_opents_compiler_target i686-pc-windows-msvc)
+    set(_opents_library_arch x86)
+elseif(OPENTS_WINDOWS_ARCH STREQUAL "x64")
+    set(CMAKE_SYSTEM_PROCESSOR AMD64)
+    set(_opents_compiler_target x86_64-pc-windows-msvc)
+    set(_opents_library_arch x64)
+else()
+    message(FATAL_ERROR "OPENTS_WINDOWS_ARCH must be x86 or x64.")
+endif()
 
 set(OPENTS_EXPERIMENTAL_CLANG_CL ON CACHE BOOL "" FORCE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "" FORCE)
@@ -45,8 +59,8 @@ foreach(_candidate IN LISTS _opents_sdk_candidates)
        AND IS_DIRECTORY "${_opents_sdk_dir}/Include/${_candidate}/ucrt"
        AND IS_DIRECTORY "${_opents_sdk_dir}/Include/${_candidate}/um"
        AND IS_DIRECTORY "${_opents_sdk_dir}/Include/${_candidate}/winrt"
-       AND IS_DIRECTORY "${_opents_sdk_dir}/Lib/${_candidate}/ucrt/x86"
-       AND IS_DIRECTORY "${_opents_sdk_dir}/Lib/${_candidate}/um/x86")
+       AND IS_DIRECTORY "${_opents_sdk_dir}/Lib/${_candidate}/ucrt/${_opents_library_arch}"
+       AND IS_DIRECTORY "${_opents_sdk_dir}/Lib/${_candidate}/um/${_opents_library_arch}")
         set(_opents_sdk_version "${_candidate}")
         break()
     endif()
@@ -70,10 +84,11 @@ find_program(_opents_llvm_lib llvm-lib REQUIRED)
 find_program(_opents_llvm_mt llvm-mt REQUIRED)
 find_program(_opents_llvm_rc llvm-rc REQUIRED)
 
+
 set(CMAKE_C_COMPILER "${_opents_clang_cl}")
 set(CMAKE_CXX_COMPILER "${_opents_clang_cl}")
-set(CMAKE_C_COMPILER_TARGET i686-pc-windows-msvc)
-set(CMAKE_CXX_COMPILER_TARGET i686-pc-windows-msvc)
+set(CMAKE_C_COMPILER_TARGET ${_opents_compiler_target})
+set(CMAKE_CXX_COMPILER_TARGET ${_opents_compiler_target})
 set(CMAKE_C_FLAGS_INIT
     "/clang:-fms-compatibility-version=${_opents_msvc_compatibility_version}")
 set(CMAKE_CXX_FLAGS_INIT
@@ -82,6 +97,7 @@ set(CMAKE_LINKER "${_opents_lld_link}")
 set(CMAKE_AR "${_opents_llvm_lib}")
 set(CMAKE_RC_COMPILER "${_opents_llvm_rc}" CACHE FILEPATH "" FORCE)
 set(CMAKE_MT "${_opents_llvm_mt}")
+
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE
     "${CMAKE_CURRENT_LIST_DIR}/clang-cl-rc-rules.cmake")
@@ -102,10 +118,10 @@ endforeach()
 set(CMAKE_RC_FLAGS_INIT "${_opents_rc_flags}")
 
 set(_opents_linker_paths
-    "/libpath:\"${_opents_msvc_dir}/atlmfc/lib/x86\""
-    "/libpath:\"${_opents_msvc_dir}/lib/x86\""
-    "/libpath:\"${_opents_sdk_dir}/Lib/${_opents_sdk_version}/ucrt/x86\""
-    "/libpath:\"${_opents_sdk_dir}/Lib/${_opents_sdk_version}/um/x86\"")
+    "/libpath:\"${_opents_msvc_dir}/atlmfc/lib/${_opents_library_arch}\""
+    "/libpath:\"${_opents_msvc_dir}/lib/${_opents_library_arch}\""
+    "/libpath:\"${_opents_sdk_dir}/Lib/${_opents_sdk_version}/ucrt/${_opents_library_arch}\""
+    "/libpath:\"${_opents_sdk_dir}/Lib/${_opents_sdk_version}/um/${_opents_library_arch}\"")
 string(JOIN " " _opents_linker_flags ${_opents_linker_paths})
 set(CMAKE_EXE_LINKER_FLAGS_INIT "${_opents_linker_flags}")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_opents_linker_flags}")

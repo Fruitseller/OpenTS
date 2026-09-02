@@ -1009,7 +1009,7 @@ RadioMessageType TechnoClass::Receive_Message(RadioClass * from, RadioMessageTyp
 		*/
 		case RADIO_ATTACK_THIS:
 			if (PrimaryWeapon != NULL) {
-				Assign_Target((AbstractClass *)param);
+				Assign_Target(reinterpret_cast<AbstractClass *>(param));
 				Assign_Mission(MISSION_ATTACK);
 				return(RADIO_ROGER);
 			}

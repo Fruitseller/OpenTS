@@ -20,10 +20,12 @@
 #include <algorithm>
 
 extern "C" {
+#if defined(_M_IX86)
 	void __cdecl Adjust_Color_555(void * palette, void * translator, int red_tint, int green_tint, int blue_tint, int intensity, bool * tint_mask);
 	void __cdecl Adjust_Color_556(void * palette, void * translator, int red_tint, int green_tint, int blue_tint, int intensity, bool * tint_mask);
 	void __cdecl Adjust_Color_565(void * palette, void * translator, int red_tint, int green_tint, int blue_tint, int intensity, bool * tint_mask);
 	void __cdecl Adjust_Color_655(void * palette, void * translator, int red_tint, int green_tint, int blue_tint, int intensity, bool * tint_mask);
+#endif
 }
 
 bool _default_mask[256] = {
@@ -196,6 +198,7 @@ void LightConvertClass::Apply_Tint(int red_tint, int green_tint, int blue_tint, 
 				}
 
 				switch (PrimaryColorMode) {
+#if defined(_M_IX86)
 					case COLORMODE_555:
 						Adjust_Color_555((void *)&ArtPalette, translator, interp_red, interp_green, interp_blue, interp_intensity, TintMask);
 						translator += PaletteClass::COLOR_COUNT;
@@ -215,6 +218,7 @@ void LightConvertClass::Apply_Tint(int red_tint, int green_tint, int blue_tint, 
 						Adjust_Color_655((void *)&ArtPalette, translator, interp_red, interp_green, interp_blue, interp_intensity, TintMask);
 						translator += PaletteClass::COLOR_COUNT;
 						break;
+#endif
 
 					default:
 						*translator = 0;

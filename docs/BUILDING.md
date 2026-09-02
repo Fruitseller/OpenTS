@@ -138,6 +138,8 @@ The toolchain requires `clang-cl`, `lld-link`, `llvm-lib`, `llvm-mt`, and
 `llvm-rc` on `PATH`. It exports `compile_commands.json`; one configuration in
 `.vscode/c_cpp_properties.clang.example.json` reads that file for IntelliSense.
 
+Set `-DOPENTS_WINDOWS_ARCH=x64` to cross-build Windows x64. The default is `x86`.
+
 ## Build from Visual Studio Code
 
 With the recommended extensions installed, the repository provides:

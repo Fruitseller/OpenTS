@@ -17,4 +17,5 @@ hierarchy.
 
 Portability follows the same incremental approach. Preparatory changes do not
 make a compiler or platform supported; [Building OpenTS](BUILDING.md) lists the
-current target.
+current target. The [macOS port plan](MACOS-PORT.md) orders the portability
+work.
