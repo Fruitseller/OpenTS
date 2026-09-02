@@ -13,6 +13,7 @@ The developer guides are split by subject:
   header, listing fields, compressed content, and object records.
 - [ts-patches in OpenTS](TS-PATCHES.md) — each CnCNet ts-patches patch and
   what OpenTS does in its place.
+- [macOS port plan](MACOS-PORT.md) — phased route to a native macOS build.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution and review rules.
 Player and modder documentation is under [manual/](../manual/README.md). When a
