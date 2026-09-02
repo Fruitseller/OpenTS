@@ -125,6 +125,7 @@ add_subdirectory(gamedirs)
 add_subdirectory(mixorder)
 add_subdirectory(ini)
 add_subdirectory(logstress)
+add_subdirectory(lcw)
 add_subdirectory(netpacket)
 add_subdirectory(statspacket)
 add_subdirectory(nettiming)
@@ -179,3 +180,4 @@ add_test(NAME toolkitheaders
     COMMAND "${CMAKE_COMMAND}" -DOPENTS_SOURCE_DIR=${CMAKE_SOURCE_DIR}
         -P "${CMAKE_SOURCE_DIR}/cmake/CheckToolkitHeaders.cmake"
 )
+add_subdirectory(vqadecode)

@@ -44,6 +44,7 @@ constexpr std::size_t FrameDelayOffset = DataOffset + offsetof(decltype(std::dec
 constexpr std::size_t VariableSizeOffset = offsetof(VariableDataType, Size);
 constexpr std::size_t MegaWhomSize = sizeof(std::declval<EventClass>().Data.MegaMission.Whom);
 
+static_assert(sizeof(EventClass) == 46);
 
 // A rejected packet fails with the expected error and hands out no events.
 void Check_Error(NetPacket::DecodeResult const & result, NetPacket::DecodeError expected)
