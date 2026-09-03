@@ -60,6 +60,21 @@ function(opents_add_test target)
     endif()
     target_link_libraries(${target} PRIVATE ${TEST_LIBRARIES})
 
+    if(NOT MSVC)
+        target_compile_options(${target} PRIVATE
+            $<$<CONFIG:Debug>:-g -O0>
+            $<$<CONFIG:Release>:-O2>
+            -fms-extensions
+            -ffp-contract=off
+        )
+    endif()
+    if(APPLE)
+        target_include_directories(${target} BEFORE PRIVATE
+            "${CMAKE_SOURCE_DIR}/code/platform/macos"
+        )
+        target_compile_definitions(${target} PRIVATE OPENTS_MACOS)
+    endif()
+
     if(TEST_STAMP)
         add_dependencies(${target} OpenTSBuildStamp)
     endif()
@@ -107,4 +122,12 @@ add_subdirectory(shapefacing)
 add_subdirectory(zbufring)
 add_subdirectory(priorityqueue)
 add_subdirectory(save)
+add_subdirectory(shadigest)
 add_subdirectory(vqadecode)
+
+if(APPLE)
+	add_subdirectory(macosaudio)
+	add_subdirectory(macosstorage)
+	add_subdirectory(peresource)
+endif()
+
