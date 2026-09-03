@@ -129,5 +129,6 @@ if(APPLE)
 	add_subdirectory(macosaudio)
 	add_subdirectory(macosstorage)
 	add_subdirectory(peresource)
+	add_subdirectory(wincontrols)
 endif()
 

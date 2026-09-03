@@ -408,6 +408,37 @@ HRSRC FindResource(HMODULE handle, LPCSTR name, LPCSTR type)
 }
 
 
+// The executable is not a PE module on macOS, so a template looked up through its
+// instance handle can only come from a loaded resource library.
+void const * OpenTSMacOS_Find_Dialog_Template(HMODULE preferred, LPCSTR name)
+{
+	std::lock_guard lock(LoadedModulesMutex);
+	auto const find_in = [name](ResourceModule const * module) -> void const * {
+		for (ResourceRecord const & resource : module->Resources) {
+			if (Keys_Match(resource.Type, RT_DIALOG) && Keys_Match(resource.Name, name)) {
+				return(module->Image.data() + resource.Offset);
+			}
+		}
+		return(nullptr);
+	};
+	auto * const requested = static_cast<ResourceModule *>(preferred);
+	if (requested != nullptr && Loaded_Modules().contains(requested)) {
+		if (void const * found = find_in(requested)) return(found);
+	}
+	for (ResourceModule const * module : Loaded_Modules()) {
+		if (module == requested) continue;
+		if (void const * found = find_in(module)) return(found);
+	}
+	return(nullptr);
+}
+
+
+char OpenTSMacOS_To_CP1252(unsigned short character)
+{
+	return(To_CP1252(character));
+}
+
+
 HGLOBAL LoadResource(HMODULE, HRSRC resource)
 {
 	return(Find_Record(resource));

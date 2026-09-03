@@ -23,7 +23,7 @@ namespace
 
 	struct ControlWindow
 	{
-		std::string ClassName = "STATIC";
+		std::string ClassName = "Static";
 		std::string Text;
 		RECT Rectangle = {0, 0, 100, 24};
 		LONG_PTR Style = WS_VISIBLE;
@@ -72,12 +72,15 @@ namespace
 		return(handle);
 	}
 
+	// Classifies only controls fabricated by GetDlgItem; a class assigned at
+	// creation or by a dialog template must survive later messages.
 	void Infer_Control_Class(ControlWindow & control, UINT message)
 	{
-		if (message >= CB_GETEDITSEL && message <= CB_GETTOPINDEX) control.ClassName = "COMBOBOX";
-		else if (message >= LB_ADDSTRING && message <= LB_FINDSTRINGEXACT) control.ClassName = "LISTBOX";
-		else if (message >= BM_GETCHECK && message <= BM_CLICK) control.ClassName = "BUTTON";
-		else if (message >= EM_SETSEL && message <= EM_SETLIMITTEXT) control.ClassName = "EDIT";
+		if (control.ClassName != "Static") return;
+		if (message >= CB_GETEDITSEL && message <= CB_GETTOPINDEX) control.ClassName = "ComboBox";
+		else if (message >= LB_ADDSTRING && message <= LB_FINDSTRINGEXACT) control.ClassName = "ListBox";
+		else if (message >= BM_GETCHECK && message <= BM_CLICK) control.ClassName = "Button";
+		else if (message >= EM_SETSEL && message <= EM_SETLIMITTEXT) control.ClassName = "Edit";
 		else if (message == TBM_SETPOS || message == TBM_SETRANGE) control.ClassName = "msctls_trackbar32";
 	}
 
@@ -242,6 +245,175 @@ namespace
 	{
 		return((static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(window)) << 17) ^ identifier);
 	}
+
+	struct ModalFrame
+	{
+		HWND Window = nullptr;
+		bool Ended = false;
+		INT_PTR Result = -1;
+	};
+
+	std::vector<ModalFrame> ModalFrames;
+
+	// Dialog units scale by the 6-by-13 base units of the 8-point MS Sans Serif
+	// dialog font; the layout reference constants in Resize_Dialog assume this.
+	int Dialog_Units_To_Pixels_X(int units) { return((units * 6 + 2) / 4); }
+	int Dialog_Units_To_Pixels_Y(int units) { return((units * 13 + 4) / 8); }
+
+	std::uint16_t Read_Template_Word(unsigned char const * data, std::size_t & offset)
+	{
+		std::uint16_t value;
+		std::memcpy(&value, data + offset, sizeof(value));
+		offset += sizeof(value);
+		return(value);
+	}
+
+	std::uint32_t Read_Template_Dword(unsigned char const * data, std::size_t & offset)
+	{
+		std::uint32_t value;
+		std::memcpy(&value, data + offset, sizeof(value));
+		offset += sizeof(value);
+		return(value);
+	}
+
+	std::string Read_Template_String(unsigned char const * data, std::size_t & offset)
+	{
+		std::string text;
+		for (std::uint16_t character = Read_Template_Word(data, offset); character != 0;
+			character = Read_Template_Word(data, offset)) {
+			text.push_back(OpenTSMacOS_To_CP1252(character));
+		}
+		return(text);
+	}
+
+	// Reads a menu, class, or title field: returns its resource ordinal, or zero
+	// after appending its string form to text.
+	std::uint16_t Read_Template_Name(unsigned char const * data, std::size_t & offset, std::string & text)
+	{
+		std::uint16_t const first = Read_Template_Word(data, offset);
+		if (first == 0xffff) return(Read_Template_Word(data, offset));
+		if (first != 0) {
+			text.push_back(OpenTSMacOS_To_CP1252(first));
+			text += Read_Template_String(data, offset);
+		}
+		return(0);
+	}
+
+	char const * Control_Class_Name(std::uint16_t ordinal)
+	{
+		switch (ordinal) {
+			case 0x0080: return("Button");
+			case 0x0081: return("Edit");
+			case 0x0082: return("Static");
+			case 0x0083: return("ListBox");
+			case 0x0084: return("ScrollBar");
+			case 0x0085: return("ComboBox");
+			default: return("Static");
+		}
+	}
+
+	struct TemplateControl
+	{
+		std::string ClassName;
+		std::string Text;
+		LONG_PTR Style = 0;
+		LONG_PTR ExtendedStyle = 0;
+		RECT Rectangle = {};
+		int Identifier = 0;
+	};
+
+	struct ParsedDialog
+	{
+		LONG_PTR Style = WS_VISIBLE;
+		std::string Title;
+		int Width = 640;
+		int Height = 480;
+		std::vector<TemplateControl> Controls;
+	};
+
+	// Accepts both the classic DLGTEMPLATE stream and the DLGTEMPLATEEX stream,
+	// trusting the blob the way the Win32 loader does.
+	ParsedDialog Parse_Dialog_Template(LPCDLGTEMPLATE dialog_template)
+	{
+		auto const * data = reinterpret_cast<unsigned char const *>(dialog_template);
+		std::size_t offset = 0;
+		std::uint16_t const version = Read_Template_Word(data, offset);
+		std::uint16_t const signature = Read_Template_Word(data, offset);
+		bool const extended = version == 1 && signature == 0xffff;
+
+		ParsedDialog dialog;
+		std::uint16_t item_count;
+		if (extended) {
+			Read_Template_Dword(data, offset); // Help identifier.
+			Read_Template_Dword(data, offset); // Extended style.
+			dialog.Style = static_cast<LONG>(Read_Template_Dword(data, offset));
+			item_count = Read_Template_Word(data, offset);
+		} else {
+			offset = 0;
+			dialog.Style = static_cast<LONG>(Read_Template_Dword(data, offset));
+			Read_Template_Dword(data, offset); // Extended style.
+			item_count = Read_Template_Word(data, offset);
+		}
+		Read_Template_Word(data, offset); // X position.
+		Read_Template_Word(data, offset); // Y position.
+		dialog.Width = Dialog_Units_To_Pixels_X(static_cast<SHORT>(Read_Template_Word(data, offset)));
+		dialog.Height = Dialog_Units_To_Pixels_Y(static_cast<SHORT>(Read_Template_Word(data, offset)));
+
+		std::string discard;
+		Read_Template_Name(data, offset, discard); // Menu.
+		Read_Template_Name(data, offset, discard); // Window class.
+		dialog.Title = Read_Template_String(data, offset);
+		if (dialog.Style & DS_SETFONT) {
+			Read_Template_Word(data, offset); // Point size.
+			if (extended) {
+				Read_Template_Word(data, offset); // Weight.
+				Read_Template_Word(data, offset); // Italic flag and character set.
+			}
+			Read_Template_String(data, offset); // Face name.
+		}
+
+		for (std::uint16_t item = 0; item < item_count; ++item) {
+			offset = (offset + 3) & ~static_cast<std::size_t>(3);
+			TemplateControl control;
+			if (extended) {
+				Read_Template_Dword(data, offset); // Help identifier.
+				control.ExtendedStyle = static_cast<LONG>(Read_Template_Dword(data, offset));
+				control.Style = static_cast<LONG>(Read_Template_Dword(data, offset));
+			} else {
+				control.Style = static_cast<LONG>(Read_Template_Dword(data, offset));
+				control.ExtendedStyle = static_cast<LONG>(Read_Template_Dword(data, offset));
+			}
+			int const x = Dialog_Units_To_Pixels_X(static_cast<SHORT>(Read_Template_Word(data, offset)));
+			int const y = Dialog_Units_To_Pixels_Y(static_cast<SHORT>(Read_Template_Word(data, offset)));
+			int const width = Dialog_Units_To_Pixels_X(static_cast<SHORT>(Read_Template_Word(data, offset)));
+			int const height = Dialog_Units_To_Pixels_Y(static_cast<SHORT>(Read_Template_Word(data, offset)));
+			control.Rectangle = {x, y, x + width, y + height};
+			control.Identifier = extended
+				? static_cast<int>(Read_Template_Dword(data, offset))
+				: static_cast<SHORT>(Read_Template_Word(data, offset));
+			std::uint16_t const class_ordinal = Read_Template_Name(data, offset, control.ClassName);
+			if (class_ordinal != 0) control.ClassName = Control_Class_Name(class_ordinal);
+			Read_Template_Name(data, offset, control.Text);
+			std::uint16_t const extra = Read_Template_Word(data, offset);
+			// The classic creation-data count includes its own size word.
+			if (extra != 0) offset += extended ? extra : extra - sizeof(std::uint16_t);
+			dialog.Controls.push_back(std::move(control));
+		}
+		return(dialog);
+	}
+
+	// Mirrors IDD_TEMPLATE in Sun.rc. The executable's dialog resources do not
+	// exist on macOS, and Resize_Dialog measures this template for its reference
+	// size.
+	constexpr WORD MEASURING_TEMPLATE_ID = 198;
+	constexpr WORD MeasuringTemplate[] = {
+		0, 0,      // Style.
+		0, 0,      // Extended style.
+		0,         // Item count.
+		0, 0,      // X and Y position.
+		200, 100,  // Width and height in dialog units.
+		0, 0, 0    // No menu, default class, empty title.
+	};
 }
 
 bool OpenTSMacOS_Is_Control_Window(HWND window)
@@ -330,7 +502,7 @@ HWND CreateWindowEx(DWORD extended_style, LPCSTR class_name, LPCSTR title, DWORD
 {
 	std::lock_guard lock(ControlMutex);
 	auto control = std::make_unique<ControlWindow>();
-	control->ClassName = class_name ? class_name : "STATIC";
+	control->ClassName = class_name ? class_name : "Static";
 	control->Text = title ? title : "";
 	control->Rectangle = {x, y, x + width, y + height};
 	control->Style = style;
@@ -351,33 +523,95 @@ HWND CreateWindowEx(DWORD extended_style, LPCSTR class_name, LPCSTR title, DWORD
 HWND CreateDialogIndirectParam(HINSTANCE, LPCDLGTEMPLATE dialog_template, HWND parent, DLGPROC procedure, LPARAM parameter)
 {
 	std::lock_guard lock(ControlMutex);
+	ParsedDialog parsed;
+	if (dialog_template != nullptr) parsed = Parse_Dialog_Template(dialog_template);
 	auto dialog = std::make_unique<ControlWindow>();
 	dialog->ClassName = "#32770";
 	dialog->Parent = parent;
-	dialog->Rectangle = {0, 0, dialog_template ? dialog_template->cx : 640, dialog_template ? dialog_template->cy : 480};
-	dialog->Style = dialog_template ? dialog_template->style : WS_VISIBLE;
+	dialog->Rectangle = {0, 0, parsed.Width, parsed.Height};
+	dialog->Style = parsed.Style;
+	dialog->Text = parsed.Title;
+	dialog->Visible = (parsed.Style & WS_VISIBLE) != 0;
+	dialog->Enabled = (parsed.Style & WS_DISABLED) == 0;
 	dialog->DialogProcedure = procedure;
 	HWND const handle = Add_Control(std::move(dialog));
-	if (procedure) procedure(handle, WM_INITDIALOG, 0, parameter);
+	HWND first_stop = nullptr;
+	for (TemplateControl const & control : parsed.Controls) {
+		HWND const child = CreateWindowEx(static_cast<DWORD>(control.ExtendedStyle),
+			control.ClassName.c_str(), control.Text.c_str(), static_cast<DWORD>(control.Style),
+			control.Rectangle.left, control.Rectangle.top,
+			control.Rectangle.right - control.Rectangle.left,
+			control.Rectangle.bottom - control.Rectangle.top,
+			handle, reinterpret_cast<HMENU>(static_cast<INT_PTR>(control.Identifier)), nullptr, nullptr);
+		if (first_stop == nullptr && (control.Style & WS_TABSTOP) != 0) first_stop = child;
+	}
+	if (procedure && procedure(handle, WM_INITDIALOG, reinterpret_cast<WPARAM>(first_stop), parameter) != 0
+	&& first_stop != nullptr) {
+		FocusWindow = first_stop;
+	}
 	return(handle);
 }
 
-HWND CreateDialogParam(HINSTANCE instance, LPCSTR, HWND parent, DLGPROC procedure, LPARAM parameter)
+HWND CreateDialogParam(HINSTANCE instance, LPCSTR template_name, HWND parent, DLGPROC procedure, LPARAM parameter)
 {
-	return(CreateDialogIndirectParam(instance, nullptr, parent, procedure, parameter));
+	void const * dialog_template = OpenTSMacOS_Find_Dialog_Template(instance, template_name);
+	if (dialog_template == nullptr
+	&& reinterpret_cast<std::uintptr_t>(template_name) == MEASURING_TEMPLATE_ID) {
+		dialog_template = MeasuringTemplate;
+	}
+	if (dialog_template == nullptr) return(nullptr);
+	return(CreateDialogIndirectParam(instance, static_cast<LPCDLGTEMPLATE>(dialog_template), parent, procedure, parameter));
 }
 
 INT_PTR DialogBoxParam(HINSTANCE instance, LPCSTR template_name, HWND parent, DLGPROC procedure, LPARAM parameter)
 {
 	HWND const dialog = CreateDialogParam(instance, template_name, parent, procedure, parameter);
 	if (!dialog) return(-1);
-	INT_PTR const result = GetWindowLongPtr(dialog, DWLP_MSGRESULT);
+	{
+		std::lock_guard lock(ControlMutex);
+		ModalFrames.push_back({dialog, Find_Control(dialog) == nullptr, -1});
+	}
+	ShowWindow(dialog, SW_SHOWNORMAL);
+	INT_PTR result = -1;
+	for (;;) {
+		{
+			std::lock_guard lock(ControlMutex);
+			ModalFrame const & frame = ModalFrames.back();
+			if (frame.Ended) {
+				result = frame.Result;
+				break;
+			}
+		}
+		MSG message;
+		if (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE)) {
+			if (message.message == WM_QUIT) {
+				PostQuitMessage(static_cast<int>(message.wParam));
+				break;
+			}
+			TranslateMessage(&message);
+			DispatchMessage(&message);
+		} else {
+			Sleep(5);
+		}
+	}
+	{
+		std::lock_guard lock(ControlMutex);
+		ModalFrames.pop_back();
+	}
 	if (OpenTSMacOS_Is_Control_Window(dialog)) DestroyWindow(dialog);
-	return(result != 0 ? result : IDCANCEL);
+	return(result);
 }
 
 BOOL EndDialog(HWND dialog, INT_PTR result)
 {
+	std::lock_guard lock(ControlMutex);
+	for (auto frame = ModalFrames.rbegin(); frame != ModalFrames.rend(); ++frame) {
+		if (frame->Window == dialog) {
+			frame->Result = result;
+			frame->Ended = true;
+			return(TRUE);
+		}
+	}
 	SetWindowLongPtr(dialog, DWLP_MSGRESULT, result);
 	return(DestroyWindow(dialog));
 }
@@ -387,6 +621,9 @@ BOOL DestroyWindow(HWND window)
 	std::lock_guard lock(ControlMutex);
 	ControlWindow * control = Find_Control(window);
 	if (!control) return(FALSE);
+	for (ModalFrame & frame : ModalFrames) {
+		if (frame.Window == window) frame.Ended = true;
+	}
 	auto const children = control->Children;
 	for (HWND child : children) DestroyWindow(child);
 	if (control->DialogProcedure) control->DialogProcedure(window, WM_DESTROY, 0, 0);
