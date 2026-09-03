@@ -140,6 +140,28 @@ The toolchain requires `clang-cl`, `lld-link`, `llvm-lib`, `llvm-mt`, and
 
 Set `-DOPENTS_WINDOWS_ARCH=x64` to cross-build Windows x64. The default is `x86`.
 
+## Experimental macOS build
+
+macOS is an unsupported bring-up target for the [macOS port](MACOS-PORT.md).
+The build uses Apple clang from the Xcode command-line tools with CMake and
+Ninja:
+
+```bash
+cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/macos
+ctest --test-dir build/macos
+```
+
+The build produces a plain arm64 or x86_64 executable in `build/macos/bin`
+and copies it next to the game data, mirroring the Windows post-build step.
+It links AppKit, Metal, and the audio and video frameworks; a Windows
+compatibility layer under `code/platform/macos` supplies the Win32, COM
+storage, DirectSound, and resource-loading interfaces the engine still calls.
+The `code/language` resource DLL is Windows-only and is skipped.
+
+Runtime behavior on macOS is under active bring-up. Do not treat this build
+as a supported configuration or its results as Windows runtime evidence.
+
 ## Build from Visual Studio Code
 
 With the recommended extensions installed, the repository provides:
