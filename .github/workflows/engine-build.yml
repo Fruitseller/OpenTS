@@ -108,3 +108,61 @@ jobs:
           path: artifact
           if-no-files-found: error
           retention-days: ${{ inputs.artifact-retention-days }}
+
+  macos:
+    name: macOS ${{ matrix.platform.architecture }} ${{ matrix.configuration }}
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: ${{ fromJSON(inputs.configurations) }}
+        platform:
+          - architecture: arm64
+            runner: macos-15
+          - architecture: x86_64
+            runner: macos-15-intel
+    steps:
+      - name: Check out OpenTS
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: recursive
+
+      - name: Report the short commit
+        id: commit
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Keep the runtime copy separate from the source tree and from any game data.
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+          -DCMAKE_OSX_ARCHITECTURES=${{ matrix.platform.architecture }}
+          -DTS_RUN_DIR=${{ github.workspace }}/artifact
+          -DOPENTS_OFFICIAL_BUILD=${{ inputs.official && 'ON' || 'OFF' }}
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Verify executable architecture
+        shell: bash
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+          ARCHITECTURE: ${{ matrix.platform.architecture }}
+        run: |
+          binary="artifact/Game"
+          if [ "${CONFIGURATION}" = "Debug" ]; then
+            binary="artifact/GameD"
+          fi
+          test -x "${binary}"
+          lipo "${binary}" -verify_arch "${ARCHITECTURE}"
+
+      - name: Upload runtime files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.artifact-prefix }}-macOS-${{ matrix.platform.architecture }}-${{ matrix.configuration }}-${{ steps.commit.outputs.short }}
+          path: artifact
+          if-no-files-found: error
+          retention-days: ${{ inputs.artifact-retention-days }}

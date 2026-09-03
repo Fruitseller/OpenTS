@@ -18,7 +18,9 @@ option(OPENTS_EXPERIMENTAL_CLANG_CL "Build with clang-cl using the MSVC ABI" OFF
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+if(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "AppleClang|Clang")
+    set(OPENTS_MACOS_BUILD ON)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
    AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     if(NOT OPENTS_EXPERIMENTAL_CLANG_CL)
         message(FATAL_ERROR
@@ -41,11 +43,22 @@ else()
 endif()
 
 string(TOLOWER "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" OPENTS_ARCH)
+if(NOT OPENTS_ARCH AND APPLE)
+    if(CMAKE_OSX_ARCHITECTURES)
+        string(REPLACE ";" "-" OPENTS_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+    else()
+        string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" OPENTS_ARCH)
+    endif()
+endif()
 if(NOT OPENTS_ARCH)
     set(OPENTS_ARCH "unknown")
 endif()
 
-enable_language(RC)
+if(WIN32)
+    enable_language(RC)
+elseif(APPLE)
+    enable_language(OBJCXX)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -89,7 +102,9 @@ add_custom_target(OpenTSBuildStamp ALL
 
 add_subdirectory(thirdparty)
 add_subdirectory(code)
-add_subdirectory(code/language)
+if(WIN32)
+    add_subdirectory(code/language)
+endif()
 
 enable_testing()
 add_subdirectory(tests)
