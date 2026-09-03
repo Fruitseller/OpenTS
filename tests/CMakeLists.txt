@@ -60,6 +60,21 @@ function(opents_add_test target)
     endif()
     target_link_libraries(${target} PRIVATE ${TEST_LIBRARIES})
 
+    if(NOT MSVC)
+        target_compile_options(${target} PRIVATE
+            $<$<CONFIG:Debug>:-g -O0>
+            $<$<CONFIG:Release>:-O2>
+            -fms-extensions
+            -ffp-contract=off
+        )
+    endif()
+    if(APPLE)
+        target_include_directories(${target} BEFORE PRIVATE
+            "${CMAKE_SOURCE_DIR}/code/platform/macos"
+        )
+        target_compile_definitions(${target} PRIVATE OPENTS_MACOS)
+    endif()
+
     if(TEST_STAMP)
         add_dependencies(${target} OpenTSBuildStamp)
     endif()
@@ -116,6 +131,8 @@ add_subdirectory(sdlkeys)
 add_subdirectory(sdlevents)
 add_subdirectory(sdlinput)
 add_subdirectory(keyqueue)
+add_subdirectory(shadigest)
+add_subdirectory(vqadecode)
 if(OPENTS_DESKTOP_TESTS)
     add_subdirectory(sdlwindow)
 endif()
@@ -126,4 +143,10 @@ add_test(NAME toolkitheaders
     COMMAND "${CMAKE_COMMAND}" -DOPENTS_SOURCE_DIR=${CMAKE_SOURCE_DIR}
         -P "${CMAKE_SOURCE_DIR}/cmake/CheckToolkitHeaders.cmake"
 )
-add_subdirectory(vqadecode)
+
+if(APPLE)
+	add_subdirectory(macosaudio)
+	add_subdirectory(macosstorage)
+	add_subdirectory(peresource)
+endif()
+
