@@ -525,6 +525,7 @@ constexpr LONG LBS_NOSEL = 0x4000L;
 constexpr LONG BS_AUTOCHECKBOX = 0x0003L;
 constexpr LONG BS_GROUPBOX = 0x0007L;
 constexpr LONG BS_OWNERDRAW = 0x000BL;
+constexpr LONG DS_SETFONT = 0x0040L;
 constexpr UINT SIF_RANGE = 0x0001;
 constexpr UINT SIF_PAGE = 0x0002;
 constexpr UINT SIF_POS = 0x0004;
@@ -1979,6 +1980,8 @@ HRSRC FindResource(HMODULE module, LPCSTR name, LPCSTR type);
 HGLOBAL LoadResource(HMODULE module, HRSRC resource);
 LPVOID LockResource(HGLOBAL resource);
 DWORD GetModuleFileName(HMODULE module, LPSTR path, DWORD size);
+void const * OpenTSMacOS_Find_Dialog_Template(HMODULE preferred, LPCSTR name);
+char OpenTSMacOS_To_CP1252(unsigned short character);
 
 #define LoadLibraryA LoadLibrary
 #define LoadStringA LoadString

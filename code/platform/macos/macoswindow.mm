@@ -18,6 +18,7 @@
 #undef interface
 
 #include <array>
+#include <cstdlib>
 #include <deque>
 #include <mutex>
 #include <set>
@@ -68,6 +69,7 @@ namespace
 	bool HasClipRectangle = false;
 	RECT ClipRectangle = {};
 	bool ClosingWindow = false;
+	bool InitialActivationDone = false;
 
 	NSCursor * Get_Hidden_Cursor(void)
 	{
@@ -340,6 +342,13 @@ namespace
 
 @end
 
+// Runs the atexit-registered Prog_End teardown from the game thread, which is
+// where AppKit delivers the close and terminate callbacks during the pump.
+static void OpenTSMacOS_Quit(void)
+{
+	std::exit(EXIT_SUCCESS);
+}
+
 @interface OpenTSWindowDelegate : NSObject<NSWindowDelegate, NSApplicationDelegate>
 @end
 
@@ -390,6 +399,11 @@ namespace
 	if (ClosingWindow) {
 		return(YES);
 	}
+	// The engine ignores WM_CLOSE, so closing the main window drives the exit
+	// directly through the atexit cleanup rather than waiting for the game.
+	if ((__bridge NSWindow *)MainNativeWindow == window) {
+		OpenTSMacOS_Quit();
+	}
 	Queue_Message((__bridge HWND)window, MessageClose);
 	return(NO);
 }
@@ -401,10 +415,7 @@ namespace
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {
-	if (MainNativeWindow != nil) {
-		Queue_Message((__bridge HWND)MainNativeWindow, MessageClose);
-		return(NSTerminateCancel);
-	}
+	OpenTSMacOS_Quit();
 	return(NSTerminateNow);
 }
 
@@ -500,10 +511,13 @@ void OpenTSMacOS_Pump_Events(void)
 		NSApplication * application = NSApplication.sharedApplication;
 		// Activation of an app launched without user interaction can be refused,
 		// which would leave the game waiting for its first focus message forever.
-		if (!application.active && MainNativeWindow != nil && MainNativeWindow.visible
-			&& !MainNativeWindow.keyWindow) {
+		// Forcing it only once lets the user later switch away without the game
+		// pulling focus back on the next pump.
+		if (!InitialActivationDone && !application.active && MainNativeWindow != nil
+			&& MainNativeWindow.visible && !MainNativeWindow.keyWindow) {
 			[application activateIgnoringOtherApps:YES];
 			[MainNativeWindow makeKeyAndOrderFront:nil];
+			InitialActivationDone = true;
 		}
 		for (;;) {
 			NSEvent * event = [application nextEventMatchingMask:NSEventMaskAny
