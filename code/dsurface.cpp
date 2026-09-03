@@ -111,6 +111,10 @@ DSurface::DSurface(int width, int height) :
 	GDIBuffer(NULL),
 	Pitch(0)
 {
+#ifdef OPENTS_MACOS
+	Pitch = width * BytesPerPixel;
+	GDIBuffer = calloc(static_cast<size_t>(height), static_cast<size_t>(Pitch));
+#else
 	/*
 	 * BITMAPINFO carries room for a single color entry, but a bitfields bitmap is
 	 * described by three masks following the header, so the header is declared with
@@ -159,6 +163,7 @@ DSurface::DSurface(int width, int height) :
 	} else {
 		Pitch = width * 2;
 	}
+#endif
 }
 
 
@@ -178,6 +183,10 @@ DSurface::DSurface(int width, int height) :
  *=============================================================================================*/
 DSurface::~DSurface(void)
 {
+#ifdef OPENTS_MACOS
+	free(GDIBuffer);
+	GDIBuffer = NULL;
+#else
 	/*
 	 * GDI will not free a bitmap that is still selected into a context, so the one the
 	 * context started with has to go back first.
@@ -197,6 +206,7 @@ DSurface::~DSurface(void)
 	}
 
 	GDIBuffer = NULL;
+#endif
 }
 
 
@@ -253,6 +263,9 @@ DSurface * DSurface::Create_Primary(void)
  *=============================================================================================*/
 HDC DSurface::GetDC(void)
 {
+#ifdef OPENTS_MACOS
+	return(NULL);
+#else
 	if (GDIDC == NULL) {
 		return(NULL);
 	}
@@ -263,6 +276,7 @@ HDC DSurface::GetDC(void)
 	 */
 	LockCount++;
 	return(GDIDC);
+#endif
 }
 
 
@@ -273,6 +287,10 @@ HDC DSurface::GetDC(void)
 /// <returns>int; Always one. The context outlives the call and is reused.</returns>
 int DSurface::ReleaseDC(HDC hdc)
 {
+#ifdef OPENTS_MACOS
+	(void)hdc;
+	return(0);
+#else
 	/*
 	 * GDI batches its drawing, so the pixels are not all there until it is flushed.
 	 * Everything else reads them directly.
@@ -288,6 +306,7 @@ int DSurface::ReleaseDC(HDC hdc)
 	}
 
 	return(1);
+#endif
 }
 
 
@@ -476,6 +495,40 @@ bool DSurface::Blit_From(Rect const & dcliprect, Rect const & destrect, Surface 
 
 	bool samesize = (sourcerect.Width == destrect.Width && sourcerect.Height == destrect.Height);
 
+#ifdef OPENTS_MACOS
+	if (samesize) {
+		bool const result = BASECLASS::Blit_From(dcliprect, destrect, ssource, scliprect, sourcerect, trans, unknown);
+		if (result && IsPrimary) Video_Mark_Dirty();
+		return(result);
+	}
+
+	Rect destination = Intersect(destrect.Bias_To(dcliprect), Intersect(dcliprect, Get_Rect()));
+	Rect const source = sourcerect.Bias_To(scliprect);
+	if (!destination.Is_Valid() || !source.Is_Valid() || Bytes_Per_Pixel() != ssource.Bytes_Per_Pixel()) return(false);
+
+	auto * target_pixels = static_cast<unsigned short *>(Lock());
+	auto const * source_pixels = static_cast<unsigned short const *>(ssource.Lock());
+	if (!target_pixels || !source_pixels) {
+		if (target_pixels) Unlock();
+		if (source_pixels) ssource.Unlock();
+		return(false);
+	}
+	int const target_stride = Stride() / static_cast<int>(sizeof(unsigned short));
+	int const source_stride = ssource.Stride() / static_cast<int>(sizeof(unsigned short));
+	for (int y = destination.Y; y < destination.Y + destination.Height; ++y) {
+		int const source_y = source.Y + (y - destrect.Y) * source.Height / destrect.Height;
+		for (int x = destination.X; x < destination.X + destination.Width; ++x) {
+			int const source_x = source.X + (x - destrect.X) * source.Width / destrect.Width;
+			unsigned short const pixel = source_pixels[source_y * source_stride + source_x];
+			if (!trans || pixel != 0) target_pixels[y * target_stride + x] = pixel;
+		}
+	}
+	ssource.Unlock();
+	Unlock();
+	if (IsPrimary) Video_Mark_Dirty();
+	return(true);
+#else
+
 	/*
 	 * The software blitter handles everything except a size change between two of these
 	 * surfaces, which GDI stretches instead.
@@ -517,6 +570,7 @@ bool DSurface::Blit_From(Rect const & dcliprect, Rect const & destrect, Surface 
 	}
 
 	return(result);
+#endif
 }
 
 

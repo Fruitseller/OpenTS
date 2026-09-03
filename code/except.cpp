@@ -44,6 +44,8 @@
 
 #include "always.h"
 
+#ifndef OPENTS_MACOS
+
 #include "except.h"
 
 // The subsystem is Windows only; other platforms get the inert stubs at the end of the file.
@@ -2240,5 +2242,7 @@ void Exception_Run_Post_Window_Test(void)
 void Exception_Wndproc_Test_Fault(void)
 {
 }
+
+#endif
 
 #endif

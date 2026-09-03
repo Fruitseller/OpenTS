@@ -14,6 +14,9 @@
 
 #include "dbgprint.h"
 #include "except.h"
+#if defined(OPENTS_MACOS)
+#include "platform/macos/macoswindow.h"
+#endif
 
 #include <bx/allocator.h>
 #include <bgfx/bgfx.h>
@@ -323,8 +326,16 @@ bool Backend_Init(NativeWindow const & window, int drawablewidth, int drawablehe
 			init.type = bgfx::RendererType::OpenGL;
 			break;
 
+		case BACKEND_RENDERER_METAL:
+			init.type = bgfx::RendererType::Metal;
+			break;
+
 		default:
+#if defined(OPENTS_MACOS)
+			init.type = bgfx::RendererType::Metal;
+#else
 			init.type = bgfx::RendererType::Count;
+#endif
 			break;
 	}
 

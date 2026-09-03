@@ -48,7 +48,7 @@
 
 #include <commctrl.h>
 #include <ctime>
-#include <sys\timeb.h>
+#include <sys/timeb.h>
 #include <utility>
 
 

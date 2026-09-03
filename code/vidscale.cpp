@@ -13,6 +13,9 @@
 
 #include "video.h"
 #include "win.h"
+#ifdef OPENTS_MACOS
+#include "platform/macos/macoswindow.h"
+#endif
 
 #include <cmath>
 
@@ -114,7 +117,11 @@ void Get_Logical_Cursor_Pos(HWND window, POINT & point)
 
 	if (window != NULL && window != MainWindow) {
 		RECT window_rect;
+#ifdef OPENTS_MACOS
+		OpenTSMacOS_Get_Window_Rect(window, &window_rect);
+#else
 		GetWindowRect(window, &window_rect);
+#endif
 
 		POINT origin;
 		origin.x = 0;

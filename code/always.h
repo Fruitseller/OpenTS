@@ -60,6 +60,46 @@
 */
 #include "visualc.h"
 
+#if !defined(_WIN32)
+#include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <strings.h>
+#ifndef stricmp
+#define stricmp strcasecmp
+#endif
+#ifndef strnicmp
+#define strnicmp strncasecmp
+#endif
+#ifndef IN
+#define IN
+#endif
+#ifndef OUT
+#define OUT
+#endif
+#ifndef _CONTROL
+#define _CONTROL 0x20
+#endif
+inline char * OpenTS_strupr(char * text)
+{
+	for (char * current = text; *current; ++current) {
+		*current = static_cast<char>(std::toupper(static_cast<unsigned char>(*current)));
+	}
+	return(text);
+}
+inline char * OpenTS_strrev(char * text)
+{
+	std::reverse(text, text + std::strlen(text));
+	return(text);
+}
+#ifndef strupr
+#define strupr OpenTS_strupr
+#endif
+#ifndef strrev
+#define strrev OpenTS_strrev
+#endif
+#endif
+
 
 #ifndef	NULL
 	#define	NULL		0

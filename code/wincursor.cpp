@@ -20,8 +20,12 @@
 #include "video.h"
 #include "win.h"
 #include "xmouse.h"
+#ifdef OPENTS_MACOS
+#include "platform/macos/macoswindow.h"
+#endif
 
 #include <cstring>
+#include <vector>
 
 
 struct CursorCacheEntry
@@ -45,6 +49,29 @@ static int _CurrentHotX = 0;
 static int _CurrentHotY = 0;
 static HCURSOR _CurrentCursor = NULL;
 static bool _CursorVisible = true;
+
+
+static void Destroy_Native_Cursor(HCURSOR cursor)
+{
+	if (cursor == NULL) {
+		return;
+	}
+#ifdef OPENTS_MACOS
+	OpenTSMacOS_Destroy_Cursor(cursor);
+#else
+	DestroyCursor(cursor);
+#endif
+}
+
+
+static void Select_Native_Cursor(HCURSOR cursor, bool visible)
+{
+#ifdef OPENTS_MACOS
+	OpenTSMacOS_Select_Cursor(cursor, visible);
+#else
+	SetCursor(visible ? cursor : NULL);
+#endif
+}
 
 
 /// <summary>
@@ -98,6 +125,10 @@ static HCURSOR Build_Cursor(ShapeSet const * shape, int frame, int hotx, int hot
 		return(NULL);
 	}
 
+#ifdef OPENTS_MACOS
+	std::vector<unsigned char> pixels(static_cast<std::size_t>(width)
+		* static_cast<std::size_t>(height) * 4);
+#else
 	BITMAPINFO info;
 	memset(&info, '\0', sizeof(info));
 	info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -115,6 +146,7 @@ static HCURSOR Build_Cursor(ShapeSet const * shape, int frame, int hotx, int hot
 	}
 
 	memset(bits, '\0', width * height * 4);
+#endif
 
 	// The shapes are palette indices and the primary is 565, so the drawer's table is
 	// what turns one into the other.
@@ -129,27 +161,32 @@ static HCURSOR Build_Cursor(ShapeSet const * shape, int frame, int hotx, int hot
 			}
 
 			unsigned short pixel = table[index];
-			unsigned long red = ((pixel >> 11) & 0x1F) << 3;
-			unsigned long green = ((pixel >> 5) & 0x3F) << 2;
-			unsigned long blue = (pixel & 0x1F) << 3;
-			unsigned long argb = 0xFF000000UL | (red << 16) | (green << 8) | blue;
+			unsigned int red = ((pixel >> 11) & 0x1F) << 3;
+			unsigned int green = ((pixel >> 5) & 0x3F) << 2;
+			unsigned int blue = (pixel & 0x1F) << 3;
 
 			for (int suby = 0; suby < scale; suby++) {
-				unsigned long * row = (unsigned long *)bits + ((rect.Y + y) * scale + suby) * width + (rect.X + x) * scale;
+#ifdef OPENTS_MACOS
+				unsigned char * row = pixels.data()
+					+ (static_cast<std::size_t>((rect.Y + y) * scale + suby) * width
+						+ static_cast<std::size_t>((rect.X + x) * scale)) * 4;
+				for (int subx = 0; subx < scale; subx++) {
+					row[subx * 4] = static_cast<unsigned char>(red);
+					row[subx * 4 + 1] = static_cast<unsigned char>(green);
+					row[subx * 4 + 2] = static_cast<unsigned char>(blue);
+					row[subx * 4 + 3] = 255;
+				}
+#else
+				unsigned int * row = (unsigned int *)bits
+					+ ((rect.Y + y) * scale + suby) * width + (rect.X + x) * scale;
+				unsigned int argb = 0xFF000000U | (red << 16) | (green << 8) | blue;
 				for (int subx = 0; subx < scale; subx++) {
 					row[subx] = argb;
 				}
+#endif
 			}
 		}
 	}
-
-	// A color cursor carries its transparency in the alpha channel, but Windows still
-	// wants a mask bitmap alongside it.
-	int mask_pitch = ((width + 15) / 16) * 2;
-	char * mask_bits = new char[mask_pitch * height];
-	memset(mask_bits, '\0', mask_pitch * height);
-	HBITMAP mask = CreateBitmap(width, height, 1, 1, mask_bits);
-	delete [] mask_bits;
 
 	int cursor_hotx = hotx * scale;
 	int cursor_hoty = hoty * scale;
@@ -157,6 +194,17 @@ static HCURSOR Build_Cursor(ShapeSet const * shape, int frame, int hotx, int hot
 	if (cursor_hoty < 0) cursor_hoty = 0;
 	if (cursor_hotx >= width) cursor_hotx = width - 1;
 	if (cursor_hoty >= height) cursor_hoty = height - 1;
+
+#ifdef OPENTS_MACOS
+	return(OpenTSMacOS_Create_Cursor(pixels.data(), width, height, cursor_hotx, cursor_hoty));
+#else
+	// A color cursor carries its transparency in the alpha channel, but Windows still
+	// wants a mask bitmap alongside it.
+	int mask_pitch = ((width + 15) / 16) * 2;
+	char * mask_bits = new char[mask_pitch * height];
+	memset(mask_bits, '\0', mask_pitch * height);
+	HBITMAP mask = CreateBitmap(width, height, 1, 1, mask_bits);
+	delete [] mask_bits;
 
 	ICONINFO icon;
 	icon.fIcon = FALSE;
@@ -169,6 +217,7 @@ static HCURSOR Build_Cursor(ShapeSet const * shape, int frame, int hotx, int hot
 	DeleteObject(mask);
 	DeleteObject(color);
 	return(cursor);
+#endif
 }
 
 
@@ -176,7 +225,7 @@ static void Flush_Cursor_Cache(void)
 {
 	for (int index = 0; index < _CursorCacheCount; index++) {
 		if (_CursorCache[index].Cursor != NULL) {
-			DestroyCursor(_CursorCache[index].Cursor);
+			Destroy_Native_Cursor(_CursorCache[index].Cursor);
 		}
 	}
 
@@ -214,7 +263,7 @@ void Win_Cursor_Set(ShapeSet const * shape, int frame, int hotx, int hoty, bool 
 		if (entry.Shape == shape && entry.Frame == frame) {
 			if (entry.HotX != hotx || entry.HotY != hoty) {
 				if (entry.Cursor != NULL) {
-					DestroyCursor(entry.Cursor);
+					Destroy_Native_Cursor(entry.Cursor);
 				}
 				entry.Cursor = Build_Cursor(shape, frame, hotx, hoty, scale);
 				entry.HotX = hotx;
@@ -245,7 +294,7 @@ void Win_Cursor_Set(ShapeSet const * shape, int frame, int hotx, int hoty, bool 
 	_CurrentCursor = cursor;
 
 	if (apply) {
-		SetCursor(_CursorVisible ? _CurrentCursor : NULL);
+		Select_Native_Cursor(_CurrentCursor, _CursorVisible);
 	}
 }
 
@@ -258,7 +307,7 @@ void Win_Cursor_Set_Visible(bool visible)
 	_CursorVisible = visible;
 
 	if (MouseCursor != NULL && MouseCursor->Is_Captured()) {
-		SetCursor(visible ? _CurrentCursor : NULL);
+		Select_Native_Cursor(_CurrentCursor, visible);
 	}
 }
 
@@ -274,7 +323,7 @@ bool Win_Cursor_Handle_Set_Cursor(void)
 		return(false);
 	}
 
-	SetCursor(_CursorVisible ? _CurrentCursor : NULL);
+	Select_Native_Cursor(_CurrentCursor, _CursorVisible);
 	return(true);
 }
 
@@ -296,7 +345,7 @@ void Win_Cursor_Refresh(void)
 /// </summary>
 void Win_Cursor_Shutdown(void)
 {
-	SetCursor(NULL);
+	Select_Native_Cursor(NULL, false);
 	Flush_Cursor_Cache();
 	_CurrentShape = NULL;
 }

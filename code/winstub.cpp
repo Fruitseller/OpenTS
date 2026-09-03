@@ -77,6 +77,9 @@
 #include "mainopt.h"
 #include "conquer.h"
 #include "opents_version.h"
+#if defined(OPENTS_MACOS)
+#include "platform/macos/macoswindow.h"
+#endif
 
 #include <algorithm>
 #include <commctrl.h>
@@ -424,6 +427,14 @@ unsigned int Build_Number(void)
 
 void Create_Main_Window ( HINSTANCE instance , int command_show , int width , int height )
 {
+#if defined(OPENTS_MACOS)
+	ProgramInstance = instance;
+	MainWindow = OpenTSMacOS_Create_Window(
+		(Options.WindowWidth > 0 && WindowedMode) ? Options.WindowWidth : width,
+		(Options.WindowHeight > 0 && WindowedMode) ? Options.WindowHeight : height,
+		WindowedMode);
+	ShowCommand = command_show;
+#else
 	InitCommonControls();
 
 	WNDCLASS    	wndclass ;
@@ -514,6 +525,7 @@ void Create_Main_Window ( HINSTANCE instance , int command_show , int width , in
 	RegisterHotKey(MainWindow, 1, MOD_ALT|MOD_CONTROL|MOD_SHIFT, VK_M);
 
 	SetCursor(LoadCursor(ProgramInstance, MAKEINTRESOURCE(CC_CURSOR)));
+#endif
 
 	//Misc_Focus_Loss_Function = &Focus_Loss;
 	//Misc_Focus_Restore_Function = &Focus_Restore;

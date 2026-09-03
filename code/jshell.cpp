@@ -37,10 +37,17 @@
 #include "always.h"
 
 #include "except.h"
+#ifdef OPENTS_MACOS
+#include "dbgprint.h"
+#endif
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#ifdef OPENTS_MACOS
+#include <csignal>
+#include <unistd.h>
+#endif
 
 /// <summary>
 /// Reports an unrecoverable engine error and ends the process.
@@ -61,7 +68,11 @@ void Fatal(char const * message, ...)
 	vsnprintf(_text, sizeof(_text), message, va);
 	va_end(va);
 
-#if defined(_WIN32)
+#if defined(OPENTS_MACOS)
+	DebugString("Fatal: %s\n", _text);
+	raise(SIGABRT);
+	_exit(EXIT_FAILURE);
+#elif defined(_WIN32)
 	ULONG_PTR const argument = (ULONG_PTR)_text;
 	RaiseException(EXCEPTION_OPENTS_FATAL, EXCEPTION_NONCONTINUABLE, 1, &argument);
 

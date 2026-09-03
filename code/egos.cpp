@@ -187,6 +187,20 @@ bool EgoClass::Scroll(int distance)
 void EgoClass::Render(bool fresh)
 {
 	if ((YPos < LogicalSurface->Get_Height() && YPos > LogicalSurface->Get_Height() - 52) || YPos >= -16 && YPos <= 32 || fresh) {
+#ifdef OPENTS_MACOS
+		int alignment = 0;
+		if (Flags & TPF_CENTER) {
+			alignment = OD_DRAW_CHAR_FLAG_HORIZONTAL_CENTER;
+		} else if (Flags & TPF_RIGHT) {
+			alignment = OD_DRAW_CHAR_ALIGN_FLAG_RIGHT;
+		}
+
+		if (GameInFocus) {
+			Rect textrect(XPos, YPos, VideoModeWidth, 0);
+			COLORREF const color = 255 | (255 << 8) | (128 << 16);
+			OD_Draw_Text_Remap(*BackgroundSurface, Text, textrect, "dlgsys", color, alignment, 0);
+		}
+#else
 		static HFONT font;
 		if (font == NULL) {
 			HDC dc = GetDC(MainWindow);
@@ -208,6 +222,7 @@ void EgoClass::Render(bool fresh)
 		if (GameInFocus) {
 			OD_Draw_Text(RGB(255, 255, 128), font, textrect, Text, strlen(Text), alignment, 0, BackgroundSurface);
 		}
+#endif
 	}
 }
 

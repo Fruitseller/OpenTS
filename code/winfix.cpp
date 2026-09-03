@@ -234,7 +234,7 @@ void TreeView_handle_item_drag(int timer_id)
 
 		i2 = std::max(rect.top - cursor.y, cursor.y - rect.bottom);
 
-		int i3 = std::max(i2, 0L);
+		int i3 = std::max(i2, 0);
 
 		if (i3 > 0) {
 			int time = 500 - 40 * i3;

@@ -392,14 +392,14 @@ BOOL Skirmish_On_WM_INITDIALOG(HWND window, WPARAM wparam, LPARAM lparam)
 	}
 
 	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_RESETCONTENT, 0, 0);
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_GOLD));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_RED));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_BLUE));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_GREEN));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_ORANGE));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_SKY_BLUE));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_PURPLE));
-	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, (LPARAM)Fetch_String(TXT_PINK));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_GOLD))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_RED))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_BLUE))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_GREEN))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_ORANGE))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_SKY_BLUE))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_PURPLE))));
+	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_INSERTSTRING, -1, reinterpret_cast<LPARAM>(static_cast<char const *>(Fetch_String(TXT_PINK))));
 	SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, CB_SETCURSEL, Session.PrefColor, 0);
 
 	for (int player = 0; player < MAX_PLAYERS; player++) {

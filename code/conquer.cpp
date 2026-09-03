@@ -125,6 +125,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#ifdef OPENTS_MACOS
+#include <sys/statvfs.h>
+#endif
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -1201,6 +1204,16 @@ TechnoTypeClass const * Fetch_Techno_Type(RTTIType type, int id)
  *=========================================================================*/
 unsigned int Disk_Space_Available(void)
 {
+#ifdef OPENTS_MACOS
+	std::string const directory = User_File_Write_Name("");
+	struct statvfs information = {};
+	if (statvfs(directory.empty() ? "." : directory.c_str(), &information) != 0) {
+		DebugString("Unable to query available disk space: %s\n", Last_Error_Text(errno));
+		return(0);
+	}
+	std::uint64_t const available = static_cast<std::uint64_t>(information.f_bavail) * information.f_frsize;
+	return(static_cast<unsigned int>(std::min<std::uint64_t>(available / 1024, UINT_MAX)));
+#else
 	ULARGE_INTEGER freebytecount;		// Free bytes on disk available to caller (caller may not have access to entire disk).
 
 	DebugString("Checking available disk space\n");
@@ -1222,6 +1235,7 @@ unsigned int Disk_Space_Available(void)
 	unsigned int const diskspace = (unsigned int)std::min<ULONGLONG>(freebytecount.QuadPart / 1024, UINT_MAX);
 	DebugString("Free disk space is %u Mb\n", diskspace / 1024);
 	return(diskspace);
+#endif
 }
 
 

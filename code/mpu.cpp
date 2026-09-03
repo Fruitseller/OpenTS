@@ -92,7 +92,13 @@ unsigned int Get_CPU_Rate(unsigned int & high)
 /// <returns>unsigned int; the low half of the clock value.</returns>
 unsigned int Get_CPU_Clock(unsigned int & high)
 {
+#if defined(OPENTS_MACOS)
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	unsigned long long const stamp = static_cast<unsigned long long>(counter.QuadPart);
+#else
 	unsigned long long const stamp = __rdtsc();
+#endif
 
 	high = (unsigned int)(stamp >> 32);
 	return((unsigned int)stamp);
