@@ -82,9 +82,11 @@ int const PacketChars = 4;
 **	The packet type is used to construct and disect the Base64 data blocks. The data
 **	consists of three source data bytes mapped onto four 6 bit Base64 code elements.
 */
+// BSD system headers define BIG_ENDIAN unconditionally; only the compiler
+// macro __BIG_ENDIAN__ identifies the target byte order.
 typedef union {
 	struct {
-#ifdef BIG_ENDIAN
+#ifdef __BIG_ENDIAN__
 		unsigned char C1;
 		unsigned char C2;
 		unsigned char C3;
@@ -96,7 +98,7 @@ typedef union {
 		unsigned char pad;
 	} Char;
 	struct {
-#ifdef BIG_ENDIAN
+#ifdef __BIG_ENDIAN__
 		unsigned O1:6;
 		unsigned O2:6;
 		unsigned O3:6;
