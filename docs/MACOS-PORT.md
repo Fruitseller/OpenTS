@@ -89,6 +89,11 @@ with C++ verified against the current output.
 
 Exit: no configuration requires MASM or inline assembly.
 
+Status: the C++ replacements are in place and no build configuration
+references MASM objects or `__asm` blocks. `LCWRoundTrip` and `VqaDecode`
+cover the compression and video paths. The Visual Studio Win32 builds have
+not been re-verified against this state.
+
 ## Phase 3 — Platform abstraction
 
 Move the remaining Windows dependencies behind a thin platform layer:
@@ -111,6 +116,17 @@ Exit: platform-dependent callers use the new interfaces, portable backends
 cover each interface, and the Windows configurations still compile against
 them.
 
+Status: instead of rewriting callers onto new interfaces, the bring-up keeps
+the Win32 API surface and supplies a compatibility layer under
+`code/platform/macos`: an AppKit window, message queue, and input path; an
+AudioQueue backend behind the DirectSound interface; BSD sockets behind the
+winsock header; a COM `IStorage`/`IStream` implementation for saves
+(`MacOSStorage`); and a PE resource reader for `Language.dll` strings and
+dialogs (`PEResource`). Whether the thin-interface extraction still happens
+per subsystem remains open; the compatibility layer is the current working
+boundary. The Windows configurations have not been re-verified against this
+state.
+
 ## Phase 4 — Non-MSVC toolchain
 
 Extend the CMake build to a clang toolchain targeting non-Windows systems.
@@ -118,6 +134,10 @@ The experimental clang-cl cross build is groundwork but still uses the MSVC
 ABI and Windows headers; this phase removes those dependencies.
 
 Exit: the tree compiles and links with Apple clang.
+
+Status: met. The tree configures, compiles, and links with Apple clang on
+macOS arm64; [Building OpenTS](BUILDING.md#experimental-macos-build) records
+the commands.
 
 ## Phase 5 — macOS bring-up
 
@@ -127,6 +147,31 @@ NEON mappings or scalar fallbacks. Verify at runtime with game assets;
 automated tests must stay free of proprietary assets.
 
 Exit: the game plays natively on macOS.
+
+Status: in progress on native arm64. A build from `build/macos` starts,
+initializes the Metal renderer and AudioQueue output, decrypts the bootstrap
+mixfiles, loads fonts and `Language.dll` resources, and reaches a rendered,
+interactive main menu with music. Bring-up so far fixed several width- and
+platform-dependent bugs the Win32 build never exercised: the SHA-1 digest
+union used `unsigned long` (`SHADigest` now uses `unsigned int`, pinned by
+`SHADigest`); the Base64 decoder keyed off `BIG_ENDIAN`, which BSD headers
+define unconditionally (now `__BIG_ENDIAN__`); and `MixFileClass::Offset`
+uppercased a string literal in place. The macOS window now accepts key
+status so the game receives its first focus event, and the main menu responds
+to real mouse and keyboard input.
+
+Known limitation past the menu: the graphic menu and the game's own
+owner-drawn dialogs run their own input loops and work, but the generic
+`DialogBoxParam`/`CreateDialogIndirectParam` shim in
+`code/platform/macos/wincontrols.cpp` is not modal. It creates the dialog,
+reads a result, and destroys it without pumping messages or laying out the
+child controls from the PE dialog template, so screens that depend on a Win32
+modal dialog are not yet interactive. A modal message loop and template-driven
+control layout are the next bring-up step. Interactive gameplay past the menu
+and the arm64 SIMD work are also unverified; the SSE2 paths still need NEON or
+scalar fallbacks. Driving the menu from an automated tool needs Accessibility
+permission for the controlling process; real keyboard and mouse input reach
+the game normally.
 
 ## Phase 6 — Support decision
 
