@@ -1370,6 +1370,13 @@ void Tactical::Draw_Screen_Text(char const * text)
 	if (text == NULL || !strlen(text)) {
 		return;
 	}
+#ifdef OPENTS_MACOS
+	Point2D point(TacticalRect.X + TacticalRect.Width / 2,
+		TacticalRect.Y + TacticalRect.Height / 2);
+	Fancy_Text_Print(text, *CompositeSurface, CompositeSurface->Get_Rect(), point,
+		Fetch_Scheme_By_Name("LightGrey"), TBLACK,
+		TextPrintType(TPF_CENTER | TPF_METAL12 | TPF_FULLSHADOW));
+#else
 	if (CompositeSurface->Is_GDI_Backed()) {
 		DSurface * surface = (DSurface *)CompositeSurface;
 		Rect rect = TacticalRect;
@@ -1396,6 +1403,7 @@ void Tactical::Draw_Screen_Text(char const * text)
 			surface->ReleaseDC(hdc);
 		}
 	}
+#endif
 }
 
 

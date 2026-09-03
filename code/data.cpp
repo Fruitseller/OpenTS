@@ -357,6 +357,12 @@ bool Init_Language_Resources(bool show_error)
 /// <remarks>Be sure that the destination buffer is big enough to hold the composed text.</remarks>
 void Get_Language_Version(char *version_string)
 {
+#ifdef OPENTS_MACOS
+	if (version_string != NULL) {
+		version_string[0] = '\0';
+		if (LanguageResources != NULL) strcpy(version_string, "Language: Language.dll");
+	}
+#else
 	INT dwSize;
 	LPVOID pFileInfo;
 	UINT puInfoLen;
@@ -411,4 +417,5 @@ void Get_Language_Version(char *version_string)
 			}
 		}
 	}
+#endif
 }
