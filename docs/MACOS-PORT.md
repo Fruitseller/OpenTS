@@ -160,18 +160,31 @@ uppercased a string literal in place. The macOS window now accepts key
 status so the game receives its first focus event, and the main menu responds
 to real mouse and keyboard input.
 
-Known limitation past the menu: the graphic menu and the game's own
-owner-drawn dialogs run their own input loops and work, but the generic
-`DialogBoxParam`/`CreateDialogIndirectParam` shim in
-`code/platform/macos/wincontrols.cpp` is not modal. It creates the dialog,
-reads a result, and destroys it without pumping messages or laying out the
-child controls from the PE dialog template, so screens that depend on a Win32
-modal dialog are not yet interactive. A modal message loop and template-driven
-control layout are the next bring-up step. Interactive gameplay past the menu
-and the arm64 SIMD work are also unverified; the SSE2 paths still need NEON or
-scalar fallbacks. Driving the menu from an automated tool needs Accessibility
-permission for the controlling process; real keyboard and mouse input reach
-the game normally.
+The dialog shim in `code/platform/macos/wincontrols.cpp` now creates child
+controls from the PE dialog template — classic and extended, with class,
+identifier, text, style, and rectangles scaled at the 6-by-13 dialog-unit base
+the engine's layout reference expects — and `DialogBoxParam` runs a modal
+message loop that returns the `EndDialog` result. Template lookup searches
+every loaded resource library because the executable is not a PE module on
+macOS; the measuring dialog the executable would provide is mirrored in the
+shim. Shim control classes now use the Win32 mixed-case names the engine
+compares against. The `WinControls` test pins the template layout, the
+dialog-unit scaling, and the modal loop without game assets. Dialog-based
+screens past the menu still need runtime verification with real input.
+
+Two macOS-only window-layer fixes address bring-up annoyances. The pump forced
+application activation on every message so it could deliver the first focus
+event; it now forces activation only once, so the user can switch to another
+application without the game pulling focus back. Closing the main window or
+choosing Quit runs the atexit-registered `Prog_End` teardown and exits, because
+the engine ignores `WM_CLOSE` by design and otherwise left the menu loop
+running with no window. This quits immediately without the engine's own
+in-mission prompts, which is acceptable while post-menu gameplay is unverified.
+
+Interactive gameplay past the menu and the arm64 SIMD work are also unverified;
+the SSE2 paths still need NEON or scalar fallbacks. Driving the menu or the
+quit gesture from an automated tool needs Accessibility permission for the
+controlling process; real keyboard and mouse input reach the game normally.
 
 ## Phase 6 — Support decision
 
