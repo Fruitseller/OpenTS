@@ -15,6 +15,8 @@
 
 #include "dbgprint.h"
 
+#ifndef OPENTS_MACOS
+
 #include "opents_build.h"
 #include "win.h"
 
@@ -622,3 +624,5 @@ char const * Last_Error_Text(unsigned long error)
 
 	return(message_buffer);
 }
+
+#endif

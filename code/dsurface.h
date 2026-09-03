@@ -116,7 +116,14 @@ class DSurface : public XSurface
 		 * This surface owns a device context, so GetDC yields one that draws on these
 		 * same pixels.
 		 */
-		virtual bool Is_GDI_Backed(void) const override {return(true);}
+		virtual bool Is_GDI_Backed(void) const override
+		{
+#ifdef OPENTS_MACOS
+			return(false);
+#else
+			return(true);
+#endif
+		}
 
 		virtual bool Can_Blit(void) const;
 

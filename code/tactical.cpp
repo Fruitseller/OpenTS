@@ -1357,9 +1357,7 @@ void Tactical::Clear_Caption_Text(void)
 
 /// <summary>
 /// Draws a line of text across the middle of the tactical view.
-/// This routine paints straight onto the composite surface with GDI, so it does nothing
-/// unless that surface can hand out a device context. It also stays quiet while the map
-/// editor is running.
+/// This routine stays quiet while the map editor is running.
 /// </summary>
 /// <param name="text">The text to display. A NULL or empty string draws nothing.</param>
 void Tactical::Draw_Screen_Text(char const * text)
@@ -1370,6 +1368,13 @@ void Tactical::Draw_Screen_Text(char const * text)
 	if (text == NULL || !strlen(text)) {
 		return;
 	}
+#ifdef OPENTS_MACOS
+	Point2D point(TacticalRect.X + TacticalRect.Width / 2,
+		TacticalRect.Y + TacticalRect.Height / 2);
+	Fancy_Text_Print(text, *CompositeSurface, CompositeSurface->Get_Rect(), point,
+		Fetch_Scheme_By_Name("LightGrey"), TBLACK,
+		TextPrintType(TPF_CENTER | TPF_METAL12 | TPF_FULLSHADOW));
+#else
 	if (CompositeSurface->Is_GDI_Backed()) {
 		DSurface * surface = (DSurface *)CompositeSurface;
 		Rect rect = TacticalRect;
@@ -1387,6 +1392,7 @@ void Tactical::Draw_Screen_Text(char const * text)
 			surface->ReleaseDC(hdc);
 		}
 	}
+#endif
 }
 
 
