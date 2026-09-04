@@ -70,6 +70,7 @@ namespace
 	RECT ClipRectangle = {};
 	bool ClosingWindow = false;
 	bool InitialActivationDone = false;
+	bool QuitRequested = false;
 
 	NSCursor * Get_Hidden_Cursor(void)
 	{
@@ -201,6 +202,23 @@ namespace
 			case 0x5C: return(NSEventModifierFlagCommand);
 			default: return(0);
 		}
+	}
+
+	bool Is_Quit_Key_Event(NSEvent * event)
+	{
+		if (event.type != NSEventTypeKeyDown) {
+			return(false);
+		}
+
+		NSEventModifierFlags constexpr shortcut_modifiers = NSEventModifierFlagCommand
+			| NSEventModifierFlagControl | NSEventModifierFlagOption | NSEventModifierFlagShift;
+		if ((event.modifierFlags & shortcut_modifiers) != NSEventModifierFlagCommand) {
+			return(false);
+		}
+
+		NSString * characters = event.charactersIgnoringModifiers;
+		return(characters.length == 1
+			&& [characters caseInsensitiveCompare:@"q"] == NSOrderedSame);
 	}
 
 	POINT Client_Point_For_Event(NSView * view, NSEvent * event)
@@ -342,11 +360,9 @@ namespace
 
 @end
 
-// Runs the atexit-registered Prog_End teardown from the game thread, which is
-// where AppKit delivers the close and terminate callbacks during the pump.
-static void OpenTSMacOS_Quit(void)
+static void OpenTSMacOS_Request_Quit(void)
 {
-	std::exit(EXIT_SUCCESS);
+	QuitRequested = true;
 }
 
 @interface OpenTSWindowDelegate : NSObject<NSWindowDelegate, NSApplicationDelegate>
@@ -379,6 +395,7 @@ static void OpenTSMacOS_Quit(void)
 
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
+	InitialActivationDone = true;
 	Queue_Message((__bridge HWND)notification.object, MessageActivateApplication, TRUE);
 }
 
@@ -399,10 +416,10 @@ static void OpenTSMacOS_Quit(void)
 	if (ClosingWindow) {
 		return(YES);
 	}
-	// The engine ignores WM_CLOSE, so closing the main window drives the exit
-	// directly through the atexit cleanup rather than waiting for the game.
+	// The engine ignores WM_CLOSE, so defer the main-window exit until AppKit
+	// has returned control to the event pump.
 	if ((__bridge NSWindow *)MainNativeWindow == window) {
-		OpenTSMacOS_Quit();
+		OpenTSMacOS_Request_Quit();
 	}
 	Queue_Message((__bridge HWND)window, MessageClose);
 	return(NO);
@@ -415,8 +432,8 @@ static void OpenTSMacOS_Quit(void)
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {
-	OpenTSMacOS_Quit();
-	return(NSTerminateNow);
+	OpenTSMacOS_Request_Quit();
+	return(NSTerminateCancel);
 }
 
 @end
@@ -429,9 +446,19 @@ static OpenTSWindowDelegate * WindowDelegate = nil;
 @end
 
 @implementation OpenTSWindow
-- (BOOL)canBecomeKeyWindow { return(YES); }
-- (BOOL)canBecomeMainWindow { return(YES); }
+- (CocoaBOOL)canBecomeKeyWindow { return(YES); }
+- (CocoaBOOL)canBecomeMainWindow { return(YES); }
 @end
+
+static void Configure_Window_Mode(NSWindow * window, bool windowed)
+{
+	if (windowed) {
+		[window center];
+	} else {
+		window.collectionBehavior = NSWindowCollectionBehaviorFullScreenPrimary;
+		window.level = NSNormalWindowLevel;
+	}
+}
 
 HWND OpenTSMacOS_Create_Window(int width, int height, bool windowed)
 {
@@ -468,12 +495,7 @@ HWND OpenTSMacOS_Create_Window(int width, int height, bool windowed)
 		MainNativeWindow.delegate = WindowDelegate;
 		application.delegate = WindowDelegate;
 
-		if (windowed) {
-			[MainNativeWindow center];
-		} else {
-			MainNativeWindow.collectionBehavior = NSWindowCollectionBehaviorFullScreenPrimary;
-			MainNativeWindow.level = NSMainMenuWindowLevel;
-		}
+		Configure_Window_Mode(MainNativeWindow, windowed);
 
 		Queue_Message((__bridge HWND)MainNativeWindow, MessageCreate);
 		[MainNativeWindow makeKeyAndOrderFront:nil];
@@ -507,6 +529,7 @@ void * OpenTSMacOS_Native_Window_Handle(HWND window)
 
 void OpenTSMacOS_Pump_Events(void)
 {
+	bool quit_requested = false;
 	@autoreleasepool {
 		NSApplication * application = NSApplication.sharedApplication;
 		// Activation of an app launched without user interaction can be refused,
@@ -517,7 +540,6 @@ void OpenTSMacOS_Pump_Events(void)
 			&& MainNativeWindow.visible && !MainNativeWindow.keyWindow) {
 			[application activateIgnoringOtherApps:YES];
 			[MainNativeWindow makeKeyAndOrderFront:nil];
-			InitialActivationDone = true;
 		}
 		for (;;) {
 			NSEvent * event = [application nextEventMatchingMask:NSEventMaskAny
@@ -525,9 +547,21 @@ void OpenTSMacOS_Pump_Events(void)
 			if (event == nil) {
 				break;
 			}
-			[application sendEvent:event];
+			// The manual event pump does not run the main menu's Cmd-Q key equivalent.
+			if (Is_Quit_Key_Event(event)) {
+				OpenTSMacOS_Request_Quit();
+			} else {
+				[application sendEvent:event];
+			}
+			if (QuitRequested) {
+				break;
+			}
 		}
 		[application updateWindows];
+		quit_requested = QuitRequested;
+	}
+	if (quit_requested) {
+		std::exit(EXIT_SUCCESS);
 	}
 }
 
@@ -1076,6 +1110,52 @@ int MessageBoxIndirect(MSGBOXPARAMS const * parameters)
 		parameters->lpszCaption, parameters->dwStyle));
 }
 
+#ifdef OPENTS_MACOS_WINDOW_TEST
+bool OpenTSMacOS_Test_Focus_Activation(void)
+{
+	InitialActivationDone = false;
+	OpenTSWindowDelegate * delegate = [[OpenTSWindowDelegate alloc] init];
+	NSNotification * notification = [NSNotification notificationWithName:@"OpenTSFocusTest"
+		object:nil];
+	[delegate windowDidBecomeKey:notification];
+	return(InitialActivationDone);
+}
+
+bool OpenTSMacOS_Test_Fullscreen_Window_Level(void)
+{
+	NSRect const frame = NSMakeRect(0.0, 0.0, 32.0, 32.0);
+	OpenTSWindow * window = [[OpenTSWindow alloc] initWithContentRect:frame
+		styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
+	Configure_Window_Mode(window, false);
+	return(window.level == NSNormalWindowLevel);
+}
+
+bool OpenTSMacOS_Test_Request_Quit(void)
+{
+	QuitRequested = false;
+	OpenTSWindowDelegate * delegate = [[OpenTSWindowDelegate alloc] init];
+	NSApplicationTerminateReply const reply =
+		[delegate applicationShouldTerminate:NSApplication.sharedApplication];
+	return(reply == NSTerminateCancel && QuitRequested);
+}
+
+bool OpenTSMacOS_Test_Command_Q(void)
+{
+	QuitRequested = false;
+	HWND const window = OpenTSMacOS_Create_Window(32, 32, true);
+	NSWindow * native_window = (__bridge NSWindow *)window;
+	NSEvent * event = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint
+		modifierFlags:NSEventModifierFlagCommand timestamp:NSProcessInfo.processInfo.systemUptime
+		windowNumber:native_window.windowNumber context:nil characters:@"q"
+		charactersIgnoringModifiers:@"q" isARepeat:NO keyCode:12];
+	[NSApplication.sharedApplication postEvent:event atStart:YES];
+	OpenTSMacOS_Pump_Events();
+	OpenTSMacOS_Destroy_Window(window);
+	return(false);
+}
+#endif
+
+#ifndef OPENTS_MACOS_WINDOW_TEST
 int main(int, char **)
 {
 	@autoreleasepool {
@@ -1083,3 +1163,4 @@ int main(int, char **)
 		return(WinMain(nullptr, nullptr, command_line, ShowNormal));
 	}
 }
+#endif
