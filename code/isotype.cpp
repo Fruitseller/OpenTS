@@ -2512,7 +2512,11 @@ bool IsometricTileTypeClass::Get_Tile_Image(int tilenum, unsigned char **buffer,
 	IsoTileSet *isotile = (IsoTileSet *)Get_Image_Data();
 
 	if (isotile != NULL) {
-		tilenum = tilenum % isotile->Tile_Count();
+		int const tile_count = isotile->Tile_Count();
+		if (tile_count <= 0) {
+			return(false);
+		}
+		tilenum = tilenum % tile_count;
 		const IsoTileRecord *record = ((const IsoTileRecord *)isotile->Fetch_Record_Pointer_Unsafe(tilenum));
 
 		if (record != NULL) {

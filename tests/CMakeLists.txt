@@ -127,9 +127,9 @@ add_subdirectory(vqadecode)
 
 if(APPLE)
 	add_subdirectory(macosaudio)
+	add_subdirectory(macoscompat)
 	add_subdirectory(macoswindow)
 	add_subdirectory(macosstorage)
 	add_subdirectory(peresource)
 	add_subdirectory(wincontrols)
 endif()
-

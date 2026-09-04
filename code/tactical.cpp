@@ -2366,8 +2366,12 @@ void Tactical::Draw_Tiles(Cell const & cell, Rect const & cliprect)
 						if (set == NULL) {
 							continue;
 						}
-						if (subtile >= set->Tile_Count() - 1) {
-							subtile = set->Tile_Count() - 1;
+						int const tile_count = set->Tile_Count();
+						if (tile_count <= 0) {
+							continue;
+						}
+						if (subtile >= tile_count - 1) {
+							subtile = tile_count - 1;
 						}
 						IsoTileRecord const * record = set->Fetch_Record_Pointer_Unsafe(subtile);
 						if (record == NULL || !record->IsHasExtraData) {

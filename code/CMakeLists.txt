@@ -199,7 +199,7 @@ message(STATUS "${PROJECT_NAME}: Adding compilier definitions...")
 if(WIN32)
     target_compile_definitions(OpenTS PRIVATE WIN32 _WINDOWS NOMINMAX)
 else()
-    target_compile_definitions(OpenTS PRIVATE OPENTS_MACOS)
+    target_compile_definitions(OpenTS PRIVATE OPENTS_MACOS $<$<CONFIG:Debug>:_DEBUG>)
 endif()
 
 #

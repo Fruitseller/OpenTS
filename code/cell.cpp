@@ -2431,9 +2431,13 @@ Rect CellClass::Cell_Render_Rect(void) const
 		if (image == NULL) {
 			return(Rect());
 		}
-		subtile = std::min(subtile, image->Tile_Count() - 1);
+		int const tile_count = image->Tile_Count();
+		if (tile_count <= 0) {
+			return(rect);
+		}
+		subtile = std::min(subtile, tile_count - 1);
 		IsoTileRecord const * tile = image->Fetch_Record_Pointer_Unsafe(subtile);
-		if (tile->IsHasExtraData) {
+		if (tile != nullptr && tile->IsHasExtraData) {
 			int dy = std::max(0, tile->Y - tile->ExtraY);
 			rect.Y -= dy;
 			rect.Height += dy;

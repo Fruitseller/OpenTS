@@ -22,7 +22,7 @@ jobs:
   package:
     name: Attach the packaged build
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     permissions:
       contents: write
     env:
@@ -39,12 +39,34 @@ jobs:
       - name: Package a release zip for each platform
         run: |
           for dir in artifact/opents-release-*-Release-*; do
+            case "${dir}" in *-macOS-*) continue ;; esac
             # Artifacts are named <prefix>-<platform>-<configuration>-<commit>, and the
             # prefix itself contains a hyphen, so count the fields from the end.
             platform="$(basename "${dir}" | awk -F- '{print $(NF-2)}')"
             ( cd "${dir}" && zip -r "${GITHUB_WORKSPACE}/OpenTS-${TAG}-${platform}.zip" \
                 Game.exe Game.pdb Language.dll \
                 LICENSE.md THIRD_PARTY_NOTICES.md OpenTS_THIRD_PARTY_LICENSES )
+          done
+          # The macOS build reads the same resource-only Language.dll as Windows.
+          language="$(ls artifact/opents-release-Win32-Release-*/Language.dll | head -n 1)"
+          for architecture in arm64 x86_64; do
+            dir="$(ls -d artifact/opents-release-macOS-${architecture}-Release-* | head -n 1)"
+            tar -xzf "${dir}/OpenTS-macOS-${architecture}-Release.tar.gz" -C "${dir}"
+            cp "${language}" "${dir}/"
+            chmod +x "${dir}/Game"
+            ( cd "${dir}" && zip "${GITHUB_WORKSPACE}/OpenTS-${TAG}-macOS-${architecture}.zip" Game Language.dll )
+          done
+
+      - name: Verify the macOS release zips
+        run: |
+          for architecture in arm64 x86_64; do
+            directory="extracted-${architecture}"
+            mkdir "${directory}"
+            unzip -q "OpenTS-${TAG}-macOS-${architecture}.zip" -d "${directory}"
+            test -x "${directory}/Game"
+            test -f "${directory}/Language.dll"
+            lipo "${directory}/Game" -verify_arch "${architecture}"
+            test "$(otool -l "${directory}/Game" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
           done
 
       - name: Attach the zips to the release

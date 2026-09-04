@@ -1,9 +1,10 @@
 ---
 title: Debug logs and console
-summary: Every run writes a timestamped log beside the executable, and the debug console can be opened to watch that output live.
+summary: Every run writes a timestamped log beside the executable and can show the output live.
 category: troubleshooting
 source_files:
   - code/dbgprint.cpp
+  - code/platform/macos/dbgprint.cpp
   - code/startup.cpp
   - code/init.cpp
 related:
@@ -61,12 +62,12 @@ Logs last written more than fourteen days ago are deleted at startup. A single l
 growing at 64 MB, and records that it has done so on its last line.
 
 The folder is created next to the executable, so the game needs write access to its own
-directory. If the folder or the file cannot be created, the game still runs and the output
-still reaches the console and an attached debugger; only the file is missing.
+directory. If the folder or the file cannot be created, the game still runs and any active
+console, terminal, or debugger output continues; only the file is missing.
 
-## Opening the console
+## Reading output live
 
-Debug builds always open the console. Release builds open it when
+On Windows, Debug builds always open a console window. Release builds open it when
 [`-XC`](/using/command-line/console-debug) is passed, which is recognized early enough that
 even messages written during startup appear. The window holds about 4000 lines of scrollback.
 
@@ -76,6 +77,10 @@ owns it. Close the game itself instead.
 The console also shows ordinary program output that a windowed application otherwise has
 nowhere to display, such as the `-?` command line help. When startup fails before the game
 window opens, the game waits for a keypress before exiting so that the message stays readable.
+
+On macOS, Debug builds write the same output to the Terminal that launched the
+game. Release builds do so when `-XC` is passed. macOS does not create a
+separate console window or wait for a keypress when command-line parsing fails.
 
 ## Before sharing a log
 

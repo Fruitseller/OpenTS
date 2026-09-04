@@ -51,23 +51,40 @@ endorsed by Electronic Arts.
   `OpenTS-<version>-x64.zip`, each containing `Game.exe`, `Language.dll`, and
   `Game.pdb`. The 32-bit build runs on both 32-bit and 64-bit Windows and has
   the longer runtime history; the 64-bit build runs on 64-bit Windows only.
+  Starting with 0.2.0, `OpenTS-<version>-macOS-arm64.zip` and
+  `OpenTS-<version>-macOS-x86_64.zip` contain `Game` and `Language.dll`.
 - **Nightly builds** are development snapshots from the
   [Engine nightly](https://github.com/OpenTS-Developers/OpenTS/actions/workflows/engine-nightly.yml)
   workflow. Download the latest one without a GitHub account through
   [nightly.link](https://nightly.link/OpenTS-Developers/OpenTS/workflows/engine-nightly/main).
   Nightlies contain the latest merged changes without release validation and
-  expire after 90 days.
+  expire after 90 days. A macOS artifact contains a `tar.gz` archive that
+  preserves the executable bit.
 
 ## Installing
 
+On Windows:
+
 1. Install Tiberian Sun from Command & Conquer The Ultimate Collection on
    Steam or the EA App.
-2. Extract the release zip into the Tiberian Sun game directory.
+2. Extract the Windows release zip into the Tiberian Sun game directory.
 3. Run `Game.exe`.
 
 OpenTS supports Windows 10 version 1903 (build 18362) and newer. Earlier
-Windows versions are untested and unsupported. Wine may work, but there is no
-supported native Linux build.
+Windows versions are untested and unsupported.
+
+On macOS 15 or newer:
+
+1. Copy the data directory from a legitimate Tiberian Sun installation.
+2. Extract a 0.2.0 or newer release zip for the Mac's architecture into that
+   directory. For an earlier revision, build the executable from source.
+3. Open Terminal in that directory and run `./Game`.
+
+The macOS executable is not notarized. If macOS blocks its first launch, use
+**Open Anyway** in **System Settings > Privacy & Security**, then launch it
+again from Terminal.
+
+Wine may work, but there is no supported native Linux build.
 
 Keep a saved game with the platform that wrote it, and play a network game with
 peers on the same platform. The 32-bit and 64-bit builds write saves and
@@ -87,11 +104,14 @@ internals.
 
 ## State and plans
 
-Release 0.1.0 runs the full Tiberian Sun 2.03 Firestorm game. The GDI, Nod,
-and Firestorm campaigns, skirmish, and save/load have received full
-play-through testing. LAN multiplayer has had more limited testing. No
-user-visible regression from the original game is currently known. The
-renderer uses
+On Windows, release 0.1.0 runs the full Tiberian Sun 2.03 Firestorm game. The
+GDI, Nod, and Firestorm campaigns, skirmish, and save/load have received full
+play-through testing. Windows LAN multiplayer has had more limited testing. On
+macOS, arm64 and x86_64 builds have loaded a campaign and completed basic unit
+selection and movement; broader play-through testing is still pending. Mixed
+Windows/macOS multiplayer is unsupported, and macOS-to-macOS multiplayer has
+not been tested. No user-visible Windows regression from the original game is
+currently known. The renderer uses
 [bgfx](https://github.com/bkaradzic/bgfx) and supports modern resolutions
 through 4K, including ultrawide.
 
@@ -113,7 +133,8 @@ reasoning.
 
 ## Building
 
-OpenTS builds for 32-bit and 64-bit Windows with Visual Studio 2022 and CMake.
+OpenTS builds for 32-bit and 64-bit Windows with Visual Studio 2022, and as
+arm64 or x86_64 on macOS with Apple clang and Ninja. Both use CMake.
 [Building OpenTS](docs/BUILDING.md) documents the exact requirements,
 commands, and outputs.
 

@@ -1,11 +1,14 @@
 # Building OpenTS
 
 > [!IMPORTANT]
-> OpenTS supports Visual Studio 2022 `Win32` and `x64` builds, each in Debug
-> and Release. All four were verified from a fresh CMake configuration. A
-> successful build does not verify runtime behavior.
+> OpenTS supports Visual Studio 2022 `Win32` and `x64` builds and macOS 15 or
+> newer on arm64 and x86_64, each in Debug and Release. All were verified from
+> fresh CMake configurations. A successful build does not verify runtime
+> behavior.
 
-## Supported target
+## Supported targets
+
+### Windows
 
 | Component | Requirement |
 | --- | --- |
@@ -18,8 +21,19 @@
 | C++ language level | C++20 |
 | Configurations | Debug and Release, on both platforms |
 
-Other generators, compilers, architectures, and configurations are currently
-unsupported.
+### macOS
+
+| Component | Requirement |
+| --- | --- |
+| Host and architecture | macOS 15 or newer; arm64 or x86_64 |
+| Generator and compiler | Ninja with Apple clang from Xcode 16 or newer |
+| CMake | 3.23 or newer |
+| C++ language level | C++20 |
+| Configurations | Debug and Release |
+
+Other generators, compilers, operating systems, architectures, and
+configurations are unsupported unless a later section marks them as an
+experiment.
 
 Install Visual Studio 2022 with the **Desktop development with C++** workload,
 a Windows SDK, and CMake 3.23 or newer. Git for Windows is needed to clone the
@@ -140,27 +154,45 @@ The toolchain requires `clang-cl`, `lld-link`, `llvm-lib`, `llvm-mt`, and
 
 Set `-DOPENTS_WINDOWS_ARCH=x64` to cross-build Windows x64. The default is `x86`.
 
-## Experimental macOS build
+## macOS build
 
-macOS is an unsupported bring-up target for the [macOS port](MACOS-PORT.md).
-The build uses Apple clang from the Xcode command-line tools with CMake and
-Ninja:
+Install the Xcode command-line tools, CMake 3.23 or newer, and Ninja. The
+default deployment target is macOS 15.0. Run these commands from the repository
+root:
 
 ```bash
-cmake -S . -B build/macos -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build/macos -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
 cmake --build build/macos
 ctest --test-dir build/macos
 ```
 
-The build produces a plain arm64 or x86_64 executable in `build/macos/bin`
+Use `-DCMAKE_BUILD_TYPE=Release` in a separate build directory for a Release
+build. On Apple Silicon, configure a separate x86_64 tree to test the Rosetta
+path:
+
+```bash
+cmake -S . -B build/macos-x86_64 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+cmake --build build/macos-x86_64
+ctest --test-dir build/macos-x86_64
+```
+
+Each build produces a plain arm64 or x86_64 executable in its `bin` directory
 and copies it next to the game data, mirroring the Windows post-build step.
+Debug builds define the engine's `_DEBUG` branches and use the `GameD` name;
+Release builds omit them and use `Game`.
 It links AppKit, Metal, and the audio and video frameworks; a Windows
 compatibility layer under `code/platform/macos` supplies the Win32, COM
 storage, DirectSound, and resource-loading interfaces the engine still calls.
 The `code/language` resource DLL is Windows-only and is skipped.
 
-Runtime behavior on macOS is under active bring-up. Do not treat this build
-as a supported configuration or its results as Windows runtime evidence.
+The campaign-launch and basic-play checks recorded in the port plan have passed
+on native arm64 and on x86_64 under Rosetta 2. These checks do not establish
+native Intel runtime coverage or Windows/macOS multiplayer determinism.
 
 ## Build from Visual Studio Code
 
@@ -229,22 +261,27 @@ not build until marked ready; the workflow then builds their current commit.
 commit is at least 25 hours old; manually started runs always build. This keeps
 the latest successful scheduled run attached to downloadable artifacts.
 
-Both use the reusable `Engine build` workflow. It runs one job per platform and
-configuration, four by default, each on its own Windows runner with Visual
-Studio 2022. A job configures and builds its platform with the commands above,
-runs CTest, and uploads the executable, language library, symbol file, and
-license notices. Artifact names contain the platform, configuration, and short
-commit, as in `opents-x64-Release-ab12cd3`. Linker maps are omitted because the
-symbol files are sufficient. A failure on either platform fails the workflow.
+Both use the reusable `Engine build` workflow. It runs one job per Windows
+platform and configuration, four by default, each on its own Windows runner
+with Visual Studio 2022. A job configures and builds its platform with the
+commands above, runs CTest, and uploads the executable, language library,
+symbol file, and license notices. Artifact names contain the platform,
+configuration, and short commit, as in `opents-x64-Release-ab12cd3`. Linker
+maps are omitted because the symbol files are sufficient. The same workflow
+builds and tests macOS arm64 and x86_64 Debug and Release, verifies each
+executable's architecture and macOS 15.0 deployment target, and uploads the
+runtime files in permission-preserving archives. A failure on any platform
+fails the workflow.
 After a successful pull-request build, `Engine build comment` maintains one
 pull-request comment with direct nightly.link downloads.
 
 Publishing a GitHub release runs `Engine release`. It builds the release commit
-for both platforms with `-DOPENTS_OFFICIAL_BUILD=ON`, and packages each one's
+for every platform with `-DOPENTS_OFFICIAL_BUILD=ON`. Each Windows zip holds
 `Game.exe`, `Language.dll`, `Game.pdb`, and the project and third-party license
-notices in a zip named after the release tag and the platform, such as
-`OpenTS-v0.2.0-x64.zip`. It attaches both to the release, and appends notes
-generated from the manual's change records by
+notices and is named after the release tag and the platform, such as
+`OpenTS-v0.2.0-x64.zip`. The macOS arm64 and x86_64 zips hold `Game` and the
+Win32 build's `Language.dll`. It attaches all of them to the release, and
+appends notes generated from the manual's change records by
 `python manual/tools/manage.py release-notes`. See
 [Maintaining](../manual/MAINTAINING.md) for the full release procedure.
 
@@ -252,17 +289,26 @@ CI collects the uploaded artifacts from `build/bin/<configuration>/`.
 
 ## Verification boundary
 
-The supported matrix was verified on September 11, 2026 with CMake 4.3.3,
+The Windows matrix was verified on September 11, 2026 with CMake 4.3.3,
 Visual Studio 2022 Community 17.14.37614.0, MSVC 19.44.35228, and Windows SDK
 10.0.26100. Fresh Win32 and x64 builds completed successfully in both
 configurations, and CTest passed all 40 tests in each of the four. The builds
 retain inherited MSVC warnings; warnings are not treated as errors, but
 contributions should not add new warnings.
 
-This verifies only that the supported toolchain compiles, links, passes the
-tests, and produces the listed files. Runtime behavior requires separate play
+The macOS matrix was verified on September 4, 2026 with macOS 26.6.2, Xcode
+26.6, Apple clang, CMake 3.31.7, and Ninja 1.12.1. Fresh arm64 and x86_64 Debug
+and Release builds targeting macOS 15.0 completed successfully, and their CTest
+suites passed with the hardware audio playback test skipped. CI also
+builds and tests both architectures and configurations on macOS 15 runners.
+
+This verifies only that the supported toolchains compile, link, pass the
+tests, and produce the listed files. Runtime behavior requires separate play
 testing, and the x64 build has none of that history: only the Win32 build has
-been played.
+been played on Windows. Asset-backed play testing on macOS 26.6.2 covered arm64
+and an x86_64 build under Rosetta 2 through campaign launch and a basic
+movement order. It did not cover macOS 15, native Intel hardware, save and
+load, mission completion, or mixed Windows/macOS multiplayer.
 
 The repository contains no maps, movies, audio, or other original game assets.
 Keep legally obtained runtime data local and outside version control. The

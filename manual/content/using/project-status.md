@@ -1,6 +1,6 @@
 ---
 title: Project status
-summary: OpenTS provides playable releases and nightly developer builds; campaigns, skirmish, saving, and LAN play are functional.
+summary: OpenTS supports Windows and macOS, with broader runtime coverage on Windows.
 category: getting-started
 source_files:
   - README.md
@@ -13,15 +13,22 @@ related:
 ---
 
 OpenTS is an active continuation of the reconstructed Tiberian Sun engine,
-released as a complete standalone `Game.exe` alongside the engine source and
-this manual.
+released as a standalone engine alongside the engine source and this manual.
 
-Release 0.1.0 runs the full Tiberian Sun 2.03 Firestorm game, with the fixes
-and changes listed in its release notes. The GDI and Nod
+Release 0.1.0 runs the full Tiberian Sun 2.03 Firestorm game on Windows, with
+the fixes and changes listed in its release notes. The GDI and Nod
 campaigns, the Firestorm campaigns, skirmish, and saving and loading are
 functional and have received full play-through testing. LAN multiplayer is
 functional with more limited testing. No user-visible regression from the
 original game is currently known. CnCNet play is not yet supported.
+
+On macOS, arm64 and x86_64 builds have loaded the first GDI campaign map,
+rendered its terrain and radar, advanced the simulation, and accepted unit
+selection and movement. The x86_64 runtime check used Rosetta 2. Campaign
+completion, save and load, native Intel hardware, and dialog screens beyond
+the tested path have not received runtime verification. Mixed Windows/macOS
+multiplayer is unsupported pending determinism evidence. macOS-to-macOS LAN
+play has not been tested.
 
 Stable releases are published on the project's GitHub releases page. Nightly
 developer builds have the latest merged changes without release validation,
@@ -32,6 +39,7 @@ original game assets; an existing Tiberian Sun installation provides them.
 
 - CMake with Visual Studio 2022
 - 32-bit and 64-bit Windows
+- macOS 15 or newer on arm64 or x86_64 with Apple clang and Ninja
 - C++20
 - Debug and Release configurations
 

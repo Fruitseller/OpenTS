@@ -1,9 +1,9 @@
 # Contributing to OpenTS
 
 OpenTS welcomes focused bug reports, proposals, documentation changes, and
-pull requests. Visual Studio 2022 Win32 and x64, each in Debug and Release,
-are the supported development targets. A successful build is not runtime
-evidence.
+pull requests. Visual Studio 2022 Win32 and x64 and macOS 15 arm64 and x86_64,
+each in Debug and Release, are the supported development targets. A successful
+build is not runtime evidence.
 
 ## Before starting
 
@@ -22,9 +22,9 @@ SDKs, credentials, personal data, IDE state, or build output.
 ## Current priorities
 
 Work toward the first [development milestone](README.md#state-and-plans) has
-review priority. Portability planning and preparatory work may proceed in
-parallel. Other pull requests are deprioritized and may wait for review;
-simple bug fixes are reviewed as time permits.
+review priority. Other pull requests are deprioritized and may wait for review;
+simple bug fixes, including fixes for supported macOS builds, are reviewed as
+time permits.
 
 ## Pull request workflow
 
@@ -135,10 +135,11 @@ or behavior that optimization may affect. Existing MSVC warnings remain;
 identify new warnings instead of describing the build as warning-free.
 
 Behavior changes need focused, reproducible evidence. Automated tests must not
-require proprietary game assets or original executables. CI builds Debug and
-Release on both platforms and runs CTest for ready engine pull requests; draft
-pull requests do not run these checks until marked ready. This is build
-evidence and does not replace any runtime testing the change needs.
+require proprietary game assets or original executables. CI builds Win32, x64,
+macOS arm64, and macOS x86_64 Debug and Release and runs CTest for ready engine
+pull requests; draft pull requests do not run these checks until marked ready.
+This is build evidence and does not replace any runtime testing the change
+needs.
 [Building OpenTS](docs/BUILDING.md#continuous-integration) documents the
 workflow.
 

@@ -137,6 +137,7 @@ jobs:
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.platform.architecture }}
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
           -DTS_RUN_DIR=${{ github.workspace }}/artifact
           -DOPENTS_OFFICIAL_BUILD=${{ inputs.official && 'ON' || 'OFF' }}
 
@@ -146,7 +147,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
-      - name: Verify executable architecture
+      - name: Verify executable architecture and deployment target
         shell: bash
         env:
           CONFIGURATION: ${{ matrix.configuration }}
@@ -158,11 +159,32 @@ jobs:
           fi
           test -x "${binary}"
           lipo "${binary}" -verify_arch "${ARCHITECTURE}"
+          test "$(otool -l "${binary}" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
+
+      # upload-artifact does not preserve executable permissions, so carry the runtime file
+      # inside an archive that does.
+      - name: Package runtime files
+        id: package
+        shell: bash
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+          ARCHITECTURE: ${{ matrix.platform.architecture }}
+        run: |
+          binary="Game"
+          if [ "${CONFIGURATION}" = "Debug" ]; then
+            binary="GameD"
+          fi
+          archive="OpenTS-macOS-${ARCHITECTURE}-${CONFIGURATION}.tar.gz"
+          tar -czf "${archive}" -C artifact "${binary}"
+          directory="$(mktemp -d)"
+          tar -xzf "${archive}" -C "${directory}"
+          test -x "${directory}/${binary}"
+          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
 
       - name: Upload runtime files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.artifact-prefix }}-macOS-${{ matrix.platform.architecture }}-${{ matrix.configuration }}-${{ steps.commit.outputs.short }}
-          path: artifact
+          path: ${{ steps.package.outputs.archive }}
           if-no-files-found: error
           retention-days: ${{ inputs.artifact-retention-days }}
