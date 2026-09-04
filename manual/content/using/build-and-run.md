@@ -1,6 +1,6 @@
 ---
 title: Build and run
-summary: Builds the Debug or Release executable for either platform and runs it against a directory of game data.
+summary: Builds the Debug or Release executable for Windows or macOS and runs it against a directory of game data.
 category: getting-started
 source_files:
   - docs/BUILDING.md
@@ -14,14 +14,22 @@ related:
     id: developer-build-troubleshooting
 ---
 
-Install Visual Studio 2022 with the **Desktop development with C++** workload, a Windows SDK, CMake 3.23 or newer, and Git for Windows. The repository's `docs/BUILDING.md` covers toolchain details and options.
+OpenTS supports Windows Win32 and macOS 15 or newer on arm64 and x86_64. The repository's `docs/BUILDING.md` owns the exact toolchain matrix.
 
 The renderer, the audio layer, and the interface toolkits are Git submodules. Fetch them before the first configure; configuration stops with instructions if one is missing.
 
-```powershell title="PowerShell"
+```bash
 git submodule update --init --recursive
+```
+
+## Windows
+
+Install Visual Studio 2022 with the **Desktop development with C++** workload, a Windows SDK, CMake 3.23 or newer, and Git for Windows.
+
+```powershell title="PowerShell"
 cmake -S . -B build -G "Visual Studio 17 2022" -A Win32
 cmake --build build --config Debug
+ctest --test-dir build -C Debug --output-on-failure
 ```
 
 The Debug build writes `GameD.exe`, its symbol file, its map file, and the matching `Language.dll` to `build/bin/Debug/`. It also copies the repository's `ui/` directory of interface documents, styles, and font beside them. Use `--config Release` to write `Game.exe` to `build/bin/Release/` instead. Each configuration has its own output folder, and the build copies nothing outside the build directory.
@@ -37,3 +45,29 @@ Put the required game data in `Run/`, then launch the built executable and name 
 A relative `-DATADIR` path is read from the directory holding the executable, not from the directory the command runs in. The game switches to the executable's directory before it reads the command line.
 
 The game reads its strings from the `Language.dll` beside the executable. The freshly built copy is the one that runs, and a localized or edited `Language.dll` in the game data directory is not read.
+
+## macOS
+
+Install the Xcode command-line tools, CMake 3.23 or newer, and Ninja. Configure
+an arm64 Debug build on Apple Silicon like this:
+
+```bash title="Terminal"
+cmake -S . -B build/macos -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+cmake --build build/macos
+ctest --test-dir build/macos --output-on-failure
+```
+
+Add `-DCMAKE_OSX_ARCHITECTURES=x86_64` and use a separate build directory for
+an Intel build. Use `-DCMAKE_BUILD_TYPE=Release` for a Release build.
+
+Debug produces `GameD`; Release produces `Game` in `build/macos/bin/`. The build
+leaves the installation's `Language.dll` unchanged. After supplying the game
+data in `Run/`, launch the executable from that directory so relative asset paths
+and `Language.dll` resolve there:
+
+```bash title="Terminal"
+cd Run
+../build/macos/bin/GameD
+```

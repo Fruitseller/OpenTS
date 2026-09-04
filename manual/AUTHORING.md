@@ -97,12 +97,11 @@ inheritance alone. Distinguish missing, empty, unknown, and unresolved inputs
 when the code does. If a generated scope conflicts with the current call path,
 fix the extractor or its adjudication instead of writing around it.
 
-Pages must name the configuration when behavior differs between the two
-supported builds. OpenTS defines no diagnostic symbol of its own; the compiler
-defines `_DEBUG` only for Debug. Code guarded by it is therefore Debug-only,
-not general behavior. The Developer mode and diagnostics page owns this split,
-and generated command records state which build contains each command, fixed
-control, and launch option. Do not duplicate that metadata.
+Pages must name the configuration when behavior differs between supported
+builds. The build defines `_DEBUG` only for Debug. Code guarded by it is
+therefore Debug-only, not general behavior. The Developer mode and diagnostics
+page owns this split, and generated command records state which build contains
+each command, fixed control, and launch option. Do not duplicate that metadata.
 
 For keys, `when_omitted` states the effective value or behavior when no input
 sets the assignment. For a fixed default, state the value as though the reader

@@ -1775,8 +1775,9 @@ inline BOOL SetForegroundWindow(HWND) { return(TRUE); }
 
 inline void _makepath(char * path, char const *, char const * directory, char const * filename, char const * extension)
 {
-	std::snprintf(path, MAX_PATH, "%s%s%s", directory ? directory : "", filename ? filename : "",
-		extension && *extension ? extension : "");
+	char const * dot = extension && *extension && *extension != '.' ? "." : "";
+	std::snprintf(path, MAX_PATH, "%s%s%s%s", directory ? directory : "", filename ? filename : "",
+		dot, extension && *extension ? extension : "");
 }
 
 inline void _splitpath(char const * path, char * drive, char * directory, char * filename, char * extension)

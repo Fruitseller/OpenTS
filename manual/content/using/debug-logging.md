@@ -1,9 +1,10 @@
 ---
 title: Debug logs and console
-summary: Every run writes a timestamped log beside the executable, and the debug console can be opened to watch that output live.
+summary: Every run writes a timestamped log beside the executable and can show the output live.
 category: troubleshooting
 source_files:
   - code/dbgprint.cpp
+  - code/platform/macos/dbgprint.cpp
   - code/startup.cpp
   - code/init.cpp
 related:
@@ -62,13 +63,15 @@ Some lines are written in several parts while the engine works through a step. S
 
 ## Opening the console
 
-Debug builds always open the console. Release builds open it when [`-XC`](/using/command-line/console-debug) is passed. The console opens before the game writes its first log line, so it shows the whole log, including startup. It keeps about 4,000 lines of scrollback.
+On Windows, Debug builds always open the console. Release builds open it when [`-XC`](/using/command-line/console-debug) is passed. The console opens before the game writes its first log line, so it shows the whole log, including startup. It keeps about 4,000 lines of scrollback.
 
 The console's close button is disabled, because closing a console window ends the program that owns it. Close the game instead.
 
 The console also shows text that a windowed program has no other place to display, such as the help that `-?` prints. In a Release build, pass `-XC` together with `-?` to read that help.
 
 After printing the help, and when it rejects an option or cannot use a directory named on the command line, the game waits for a keypress in the console before it exits, so the text stays readable.
+
+On macOS, Debug builds write the same output to the Terminal that launched the game. Release builds do so when `-XC` is passed. macOS opens no separate console window, and the game does not wait for a keypress before it exits.
 
 ## Before sharing a log
 

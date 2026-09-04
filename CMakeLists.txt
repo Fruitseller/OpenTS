@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.23)
 
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin"
+   AND (NOT DEFINED CMAKE_SYSTEM_NAME OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+   AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+	set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum supported macOS version")
+endif()
+
 project(OpenTS VERSION 0.2.0 LANGUAGES C CXX)
 
 # A SemVer prerelease label, which project() cannot carry because it takes numbers only. Set it

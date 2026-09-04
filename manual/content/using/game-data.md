@@ -29,6 +29,8 @@ Keep the data in `Run/`, not in the CMake build directory. A build writes its ou
 
 The game offers Firestorm only when it finds `FIRESTRM.INI`, either as a loose file or inside `PATCH.MIX`, `PCACHE.MIX`, or an `EXPAND` or `ECACHE` [archive](/formats/mix/). No other expansion file is checked. Without `FIRESTRM.INI` only the base game can be played, and with it Firestorm is offered even when other expansion files are missing. `RulesExpansion` in [`OPENTS.INI`](/formats/opents-ini/) can name a different file.
 
+The macOS build reads the `Language.dll` already in the game-data directory; official macOS release archives from 0.2.0 onward include the matching library.
+
 ## Keeping the data somewhere else
 
 [`-DATADIR=<path>`](/using/command-line/data-directory/) names the game data directory, which the game reads its data from and never writes to. Without it, the game reads its data from the directory that holds the executable.

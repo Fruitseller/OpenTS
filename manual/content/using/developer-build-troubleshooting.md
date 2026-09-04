@@ -17,7 +17,7 @@ related:
 
 A message that a `thirdparty/` directory such as `thirdparty/bgfx.cmake` is empty means the clone did not fetch the submodules. Run `git submodule update --init --recursive` and configure again.
 
-Use the Visual Studio 2022 generator with `-A Win32` or `-A x64`. Other compilers, Visual Studio versions, and target architectures are unsupported. Configuration stops for MSVC older than 19.30 and for compilers other than MSVC, apart from the experimental clang-cl cross-build that `docs/BUILDING.md` describes.
+On Windows, use the Visual Studio 2022 generator with `-A Win32` or `-A x64`. On macOS 15 or newer, use Ninja and Apple clang with an arm64 or x86_64 target. Other compilers, Visual Studio versions, and target architectures are unsupported. Configuration stops for MSVC older than 19.30 and for compilers other than MSVC and Apple clang, apart from the experimental clang-cl cross-build that `docs/BUILDING.md` describes.
 
 A build directory holds one platform. Configuring the other platform over it fails, so give each platform its own directory.
 
@@ -25,10 +25,14 @@ If CMake cannot find a Visual Studio installation through the Visual Studio Inst
 
 ## The executable is not in the run directory
 
-Builds write their runnable files to `build/bin/<configuration>/` and copy nothing into `Run/`:
+Builds write their runnable files to their build directory's `bin` folder and copy nothing into `Run/`.
+
+On Windows, in `build/bin/<configuration>/`:
 
 - Debug: `GameD.exe`, `GameD.pdb`, `GameD.map`, `Language.dll`, and the `ui/` directory
 - Release: `Game.exe`, `Game.pdb`, `Game.map`, `Language.dll`, and the `ui/` directory
+
+On macOS, Debug builds `GameD` and Release builds `Game` in `build/macos/bin/`. The macOS build does not replace `Language.dll`.
 
 ## The executable cannot initialize game data
 
