@@ -172,14 +172,16 @@ compares against. The `WinControls` test pins the template layout, the
 dialog-unit scaling, and the modal loop without game assets. Dialog-based
 screens past the menu still need runtime verification with real input.
 
-Two macOS-only window-layer fixes address bring-up annoyances. The pump forced
-application activation on every message so it could deliver the first focus
-event; it now forces activation only once, so the user can switch to another
-application without the game pulling focus back. Closing the main window or
-choosing Quit runs the atexit-registered `Prog_End` teardown and exits, because
-the engine ignores `WM_CLOSE` by design and otherwise left the menu loop
-running with no window. This quits immediately without the engine's own
-in-mission prompts, which is acceptable while post-menu gameplay is unverified.
+The macOS window layer forces activation only until AppKit reports that the
+window became key. Later application switches do not pull the game back into
+focus, and a borderless full-screen window stays at the normal window level so
+the selected application can appear above it. Closing the main window or
+choosing Quit requests an exit from the AppKit callback; the event pump runs
+the atexit-registered `Prog_End` teardown after the callback returns. The engine
+ignores `WM_CLOSE` by design, so this still quits immediately without the
+engine's own in-mission prompts. The `MacOSWindow` test pins the activation
+latch, full-screen window level, and deferred quit boundary without game
+assets. Post-menu gameplay remains unverified.
 
 Interactive gameplay past the menu and the arm64 SIMD work are also unverified;
 the SSE2 paths still need NEON or scalar fallbacks. Driving the menu or the

@@ -200,6 +200,7 @@ add_test(NAME toolkitheaders
 
 if(APPLE)
 	add_subdirectory(macosaudio)
+	add_subdirectory(macoswindow)
 	add_subdirectory(macosstorage)
 	add_subdirectory(peresource)
 	add_subdirectory(wincontrols)
