@@ -221,7 +221,7 @@ job stops the run before anything is built when:
 
 The build passes the tag's label to CMake and fails unless the built version is
 exactly `<core>-<label>`, or `<core>` for a final. The workflow then attaches one
-zip per platform and writes the generated notes into the release body between
+zip per platform (Win32, x64, macOS arm64, and macOS x86_64) and writes the generated notes into the release body between
 two marker comments. Write your own text above the markers; a rerun replaces
 only the text between them.
 

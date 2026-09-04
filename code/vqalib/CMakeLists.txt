@@ -38,7 +38,7 @@ endif()
 if(WIN32)
     target_compile_definitions(VQALib PRIVATE WIN32 _WINDOWS _MBCS NOMINMAX)
 else()
-    target_compile_definitions(VQALib PRIVATE OPENTS_MACOS __cdecl=)
+    target_compile_definitions(VQALib PRIVATE OPENTS_MACOS __cdecl= $<$<CONFIG:Debug>:_DEBUG>)
 endif()
 
 # Callers reach the vqaplay.h family through the library, while the player itself reaches

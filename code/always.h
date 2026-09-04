@@ -34,6 +34,7 @@
 // Disable warning about exception handling not being enabled. It's used as part of STL - in a part of STL we don't use.
 #pragma warning(disable : 4530)
 
+
 // Jani: Intel's C++ compiler issues too many warnings in WW libraries when using warning level 4
 #if defined (__ICL)    // Detect Intel compiler
 #pragma warning (3)

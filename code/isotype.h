@@ -22,6 +22,8 @@
 #include "isotype.hh"
 #include "land.hh"
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 class LightConvertClass;
@@ -29,7 +31,12 @@ class Surface;
 class ShapeSet;
 
 #pragma pack(4)
+#if defined(__clang__) && !defined(_MSC_VER)
+// TMP records use the Microsoft bitfield layout written by the original tools.
+struct __attribute__((ms_struct)) IsoTileRecord
+#else
 struct IsoTileRecord
+#endif
 {
 	/*
 	 * These are the pixel coordinates of this sub-tile's image within the tile set.
@@ -113,16 +120,28 @@ struct IsoTileRecord
 static_assert(sizeof(IsoTileRecord) == 52, "a TMP tile record is 52 bytes on disk");
 #pragma pack()
 
+static_assert(offsetof(IsoTileRecord, Height) == 40);
+static_assert(offsetof(IsoTileRecord, LowColor) == 43);
+static_assert(sizeof(IsoTileRecord) == 52);
+
 #pragma pack(4)
 class IsoTileSet
 {
 	friend class IsometricTileClass;
 	friend class IsometricTileTypeClass;
+#if defined(OPENTS_MACOS_COMPAT_TEST)
+	friend struct IsoTileSetTestAccess;
+#endif
 
 	public:
 		IsoTileRecord const * Fetch_Record_Pointer(int index) const
 		{
-			return(Record_At(index % Tile_Count()));
+			int const tile_count = Tile_Count();
+			return(tile_count > 0 ? Fetch_Record_Pointer_Unsafe(index % tile_count) : nullptr);
+		}
+		IsoTileRecord * Fetch_Record_Pointer(int index)
+		{
+			return(const_cast<IsoTileRecord *>(static_cast<IsoTileSet const *>(this)->Fetch_Record_Pointer(index)));
 		}
 		IsoTileRecord const * Fetch_Record_Pointer_Unsafe(int index) const
 		{

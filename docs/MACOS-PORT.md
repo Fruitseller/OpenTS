@@ -3,9 +3,9 @@
 This page records the high-level route to a natively running macOS build. It
 orders the work and names exit criteria; it does not schedule it. Each phase
 decomposes into small, individually reviewable changes. [Building
-OpenTS](BUILDING.md) stays the authority on supported targets: macOS becomes
-supported only by an explicit decision once the port reaches verified runtime
-behavior.
+OpenTS](BUILDING.md) stays the authority on supported targets. Phase 6 records
+the explicit decision that made macOS supported after the port reached verified
+runtime behavior.
 
 ## Ground rules
 
@@ -36,7 +36,7 @@ inventory is closed, and the save-format decision is documented and tested.
 | --- | --- | --- |
 | Save streams and swizzling | `CONTENTS` is written field by field, but it includes native-width pointer values used as swizzle IDs and other layout-sensitive members. The pointer width therefore changes the stream, even though COM storage itself is architecture-neutral. | Save headers now record the writer's pointer width. Load admission rejects a different width before reading `CONTENTS`. |
 | Network packets and replays | `EventClass` is a packed wire record and replays write the same record. | Its 46-byte legacy layout remains the contract. `NetContract` checks the size and the compressed and uncompressed decoders on both build architectures. |
-| TMP tile data | The tile table stores 32-bit offsets from the start of the file, not native pointers. | The in-memory view keeps those entries as `uint32_t` and resolves each offset when accessed instead of rewriting the mapped data as pointers. |
+| TMP tile data | The tile table stores 32-bit offsets from the start of the file, not native pointers. Its records use the 52-byte Microsoft bitfield layout. | The in-memory view keeps table entries as `uint32_t`, resolves each offset when accessed, and preserves the record layout on Apple clang. |
 | Window procedures, timers, and VQA callbacks | Several Win32 callbacks and user-data slots carried pointers through `int`, `long`, or `DWORD`. | Callback signatures and storage use `INT_PTR`, `LONG_PTR`, `DWORD_PTR`, `WPARAM`, `LPARAM`, `intptr_t`, or `uintptr_t` as required by the API. |
 | Rendering scratch buffers | Z, alpha, and isometric drawing paths used 32-bit integers for addresses and pointer arithmetic. | Address-bearing values use pointers or `uintptr_t`; sizes and pixel offsets remain fixed-width values. |
 | Crash reports | The stack walker and register report assumed an x86 `CONTEXT`. | The reporter selects the x86 or AMD64 context fields and machine type at compile time. |
@@ -136,7 +136,7 @@ ABI and Windows headers; this phase removes those dependencies.
 Exit: the tree compiles and links with Apple clang.
 
 Status: met. The tree configures, compiles, and links with Apple clang on
-macOS arm64; [Building OpenTS](BUILDING.md#experimental-macos-build) records
+macOS arm64; [Building OpenTS](BUILDING.md#macos-build) records
 the commands.
 
 ## Phase 5 — macOS bring-up
@@ -148,7 +148,7 @@ automated tests must stay free of proprietary assets.
 
 Exit: the game plays natively on macOS.
 
-Status: in progress on native arm64. A build from `build/macos` starts,
+Status: runtime exit met on native arm64. A build from `build/macos` starts,
 initializes the Metal renderer and AudioQueue output, decrypts the bootstrap
 mixfiles, loads fonts and `Language.dll` resources, and reaches a rendered,
 interactive main menu with music. Bring-up so far fixed several width- and
@@ -181,12 +181,33 @@ the atexit-registered `Prog_End` teardown after the callback returns. The engine
 ignores `WM_CLOSE` by design, so this still quits immediately without the
 engine's own in-mission prompts. The `MacOSWindow` test pins the activation
 latch, full-screen window level, and deferred quit boundary without game
-assets. Post-menu gameplay remains unverified.
+assets.
 
-Interactive gameplay past the menu and the arm64 SIMD work are also unverified;
-the SSE2 paths still need NEON or scalar fallbacks. Driving the menu or the
-quit gesture from an automated tool needs Accessibility permission for the
-controlling process; real keyboard and mouse input reach the game normally.
+Asset-backed Debug arm64 and x86_64 `-SPAWN` runs load `GDI1A.MAP`, render its
+terrain and radar, and advance the simulation. The arm64 session remained live
+for more than three minutes; the corrected x86_64 session also remained live
+under Rosetta 2 for more than three minutes. Direct mouse input selected an
+infantry unit and issued a movement order in both architectures. This verifies
+the campaign launch and basic-play path, not mission completion, save and load, or
+every dialog-based screen.
+
+Campaign loading exposed three terrain compatibility faults. The macOS
+`_makepath` shim omitted the separator before theater suffixes, so it searched
+for names such as `CLEAR01TEM` instead of `CLEAR01.TEM`; `MacOSCompat` pins the
+correct separator behavior. Apple clang also packed `IsoTileRecord` bitfields
+differently from the 52-byte TMP file record, so the macOS view now selects the
+Microsoft layout and checks the record size and offsets at compile time.
+Finally, empty tile sets and absent sub-tile records now avoid invalid
+arithmetic and indexing, while `Cell_Render_Rect` keeps the cell's base bounds
+when the optional record is absent. The x86_64 run also exposed a Windows-to-
+macOS `long` width mismatch in the credits format; the readout now formats its
+32-bit value correctly on both architectures.
+
+No enabled first-party SSE or MMX path remains in the arm64 build; bgfx selects
+its NEON path, and `SosParity` checks the portable audio decoder against
+recorded assembly output in Windows and macOS test builds. The Phase 5 exit is
+met for the tested campaign path. The support decision does not broaden this
+runtime evidence.
 
 ## Phase 6 — Support decision
 
@@ -194,6 +215,13 @@ Decide whether macOS becomes a supported target: update
 [Building OpenTS](BUILDING.md) and continuous integration, and record the
 stance on cross-platform multiplayer, where floating-point determinism
 between compilers and architectures is unresolved.
+
+Status: complete. macOS 15 or newer is supported on arm64 and x86_64 with
+Apple clang, CMake, and Ninja. Continuous integration builds and tests Debug
+and Release for both architectures and verifies their executable architecture
+and deployment target. Mixed Windows/macOS multiplayer remains unsupported
+until cross-compiler and cross-architecture simulation determinism is
+established. macOS-to-macOS multiplayer has not received runtime testing.
 
 ## Execution notes for agents
 

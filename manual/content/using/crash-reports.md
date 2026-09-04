@@ -1,9 +1,10 @@
 ---
 title: Crash reports
-summary: A crash writes a minidump, a readable report, and the end of that run's debug log into a folder of its own beside the executable.
+summary: Windows writes a dump bundle; macOS writes a signal report and backtrace.
 category: troubleshooting
 source_files:
   - code/except.cpp
+  - code/platform/macos/except.cpp
   - code/startup.cpp
   - code/init.cpp
 related:
@@ -13,7 +14,9 @@ related:
     id: launch:exception-test
 ---
 
-## Where a crash is written
+## Windows crash reports
+
+### Where a crash is written
 
 A crash writes its files into a new folder under `Exceptions`, in the directory that holds the executable. The folder is named for the local time of the crash and the process id:
 
@@ -36,7 +39,7 @@ At startup, the game deletes crash folders last modified more than 30 days ago.
 
 When a debugger is attached to the game, the debugger receives the crash and no folder is written.
 
-## What the report holds
+### What the report holds
 
 The report opens with a header that identifies the build and the run:
 
@@ -60,7 +63,7 @@ The report ends by naming the folder and saying whether the minidump and the log
 
 If one section faults while it is being written, the section ends with a note and the rest of the report is still written. The exception is a crash while the crash handler is still starting, or on a machine where it could not start its reporting thread. A fault in the report then ends the process, and only the files already written are kept.
 
-## Addresses and symbols
+### Addresses and symbols
 
 The crash handler looks for the symbol file (`Game.pdb` or `GameD.pdb`) in the executable's directory, whatever directory the game was launched from. Keep the symbol file beside the executable to get function names and source lines in the report.
 
@@ -69,7 +72,7 @@ Without a usable symbol file, the report still identifies every address by modul
 - no symbol handler could be started;
 - no symbol file matching this executable was found.
 
-## What is covered
+### What is covered
 
 - A crash on any thread, not only the main one.
 - A crash during startup, from the first step of the game's startup code. A fault is reported before the window, sound, and renderer exist. A fault while global data is being set up, before that step, writes no crash folder.
@@ -77,13 +80,21 @@ Without a usable symbol file, the report still identifies every address by modul
 - A call to a pure virtual function, a rejected argument to a C runtime function, a `terminate` call from the C++ runtime, and an aborted run.
 - An unrecoverable error the engine reported itself. Its message appears in the report.
 
-## The crash dialog
+### The crash dialog
 
 After writing the folder, the game shows the report and the folder's path in a dialog:
 
 - `Save full dump` writes `fulldump.dmp`, which holds the whole address space and is much larger than `minidump.dmp`. Save one for a crash that the report cannot explain.
 - `Debug` breaks into an attached debugger. The process ends when the debugger lets it continue. Without a debugger, `Debug` acts like `Quit`.
 - `Quit` ends the process, as does closing the dialog.
+
+## macOS crash reports
+
+macOS writes `Crash/crash-report.txt` beside the executable. The file records
+the signal number, fault address, current debug-log path, and a native
+backtrace. A later crash replaces the file. The macOS handler does not write a
+minidump, collect the Windows machine-state sections, or show the Windows crash
+dialog.
 
 ## Raising a crash on purpose
 
