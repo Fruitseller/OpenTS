@@ -14,6 +14,7 @@
 HWND OpenTSMacOS_Create_Window(int width, int height, bool windowed);
 void OpenTSMacOS_Destroy_Window(HWND window);
 void * OpenTSMacOS_Native_Window_Handle(HWND window);
+HWND OpenTSMacOS_Get_Main_Native_Window(void);
 
 void OpenTSMacOS_Pump_Events(void);
 

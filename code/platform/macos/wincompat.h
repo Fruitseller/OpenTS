@@ -263,6 +263,22 @@ struct DRAWITEMSTRUCT {
 };
 using LPDRAWITEMSTRUCT = DRAWITEMSTRUCT *;
 constexpr UINT ODT_BUTTON = 4;
+constexpr UINT ODT_STATIC = 5;
+
+constexpr UINT ODA_DRAWENTIRE = 0x0001;
+constexpr UINT ODA_SELECT = 0x0002;
+constexpr UINT ODA_FOCUS = 0x0004;
+
+constexpr UINT ODS_SELECTED = 0x0001;
+constexpr UINT ODS_GRAYED = 0x0002;
+constexpr UINT ODS_DISABLED = 0x0004;
+constexpr UINT ODS_CHECKED = 0x0008;
+constexpr UINT ODS_FOCUS = 0x0010;
+constexpr UINT ODS_DEFAULT = 0x0020;
+constexpr UINT ODS_HOTLIGHT = 0x0040;
+constexpr UINT ODS_INACTIVE = 0x0080;
+constexpr UINT ODS_NOACCEL = 0x0100;
+constexpr UINT ODS_NOFOCUSRECT = 0x0200;
 using LPRECT = RECT *;
 using PULARGE_INTEGER = ULARGE_INTEGER *;
 using DLGPROC = INT_PTR (CALLBACK *)(HWND, UINT, WPARAM, LPARAM);
@@ -424,6 +440,7 @@ constexpr UINT LBN_DBLCLK = 2;
 constexpr UINT BST_UNCHECKED = 0;
 constexpr UINT BST_CHECKED = 1;
 constexpr UINT BST_INDETERMINATE = 2;
+constexpr UINT BST_PUSHED = 4;
 constexpr LRESULT CB_ERR = -1;
 constexpr LRESULT LB_ERR = -1;
 constexpr UINT BM_GETCHECK = 0x00F0;
@@ -503,7 +520,10 @@ constexpr UINT SB_ENDSCROLL = 8;
 constexpr UINT SWP_NOSIZE = 0x0001;
 constexpr UINT SWP_NOMOVE = 0x0002;
 constexpr UINT SWP_NOZORDER = 0x0004;
+constexpr UINT SWP_NOREDRAW = 0x0008;
 constexpr UINT SWP_NOACTIVATE = 0x0010;
+constexpr UINT SWP_SHOWWINDOW = 0x0040;
+constexpr UINT SWP_HIDEWINDOW = 0x0080;
 constexpr UINT SWP_NOOWNERZORDER = 0x0200;
 constexpr DWORD MONITOR_DEFAULTTONEAREST = 2;
 constexpr UINT CS_VREDRAW = 0x0001;
@@ -518,11 +538,17 @@ constexpr LONG ES_MULTILINE = 0x0004L;
 constexpr LONG ES_PASSWORD = 0x0020L;
 constexpr LONG SS_CENTER = 0x0001L;
 constexpr LONG SS_RIGHT = 0x0002L;
+constexpr LONG SS_NOTIFY = 0x0100L;
 constexpr UINT MK_LBUTTON = 0x0001;
 constexpr LONG LBS_MULTIPLESEL = 0x0008L;
 constexpr LONG LBS_EXTENDEDSEL = 0x0800L;
 constexpr LONG LBS_NOSEL = 0x4000L;
+constexpr LONG BS_PUSHBUTTON = 0x0000L;
+constexpr LONG BS_DEFPUSHBUTTON = 0x0001L;
+constexpr LONG BS_CHECKBOX = 0x0002L;
 constexpr LONG BS_AUTOCHECKBOX = 0x0003L;
+constexpr LONG BS_3STATE = 0x0005L;
+constexpr LONG BS_AUTO3STATE = 0x0006L;
 constexpr LONG BS_GROUPBOX = 0x0007L;
 constexpr LONG BS_OWNERDRAW = 0x000BL;
 constexpr LONG DS_SETFONT = 0x0040L;
@@ -555,6 +581,10 @@ constexpr DWORD VER_PLATFORM_WIN32_WINDOWS = 1;
 constexpr DWORD VER_PLATFORM_WIN32_NT = 2;
 #define HKEY_LOCAL_MACHINE reinterpret_cast<HKEY>(static_cast<UINT_PTR>(0x80000002u))
 #define HWND_DESKTOP nullptr
+#define HWND_TOP (reinterpret_cast<HWND>(0))
+#define HWND_BOTTOM (reinterpret_cast<HWND>(1))
+#define HWND_TOPMOST (reinterpret_cast<HWND>(-1))
+#define HWND_NOTOPMOST (reinterpret_cast<HWND>(-2))
 #define IDC_ARROW MAKEINTRESOURCE(32512)
 #define IDC_NO MAKEINTRESOURCE(32648)
 constexpr DWORD RT_DIALOG_VALUE = 5;
@@ -573,6 +603,55 @@ constexpr int SM_CXDRAG = 68;
 constexpr int SM_CYDRAG = 69;
 constexpr int SM_CXFULLSCREEN = 16;
 constexpr int SM_CYFULLSCREEN = 17;
+
+#ifndef VK_BACK
+constexpr int VK_BACK = 0x08;
+#endif
+#ifndef VK_TAB
+constexpr int VK_TAB = 0x09;
+#endif
+#ifndef VK_RETURN
+constexpr int VK_RETURN = 0x0D;
+#endif
+#ifndef VK_SHIFT
+constexpr int VK_SHIFT = 0x10;
+#endif
+#ifndef VK_CONTROL
+constexpr int VK_CONTROL = 0x11;
+#endif
+#ifndef VK_MENU
+constexpr int VK_MENU = 0x12;
+#endif
+#ifndef VK_ESCAPE
+constexpr int VK_ESCAPE = 0x1B;
+#endif
+#ifndef VK_SPACE
+constexpr int VK_SPACE = 0x20;
+#endif
+#ifndef VK_PRIOR
+constexpr int VK_PRIOR = 0x21;
+#endif
+#ifndef VK_NEXT
+constexpr int VK_NEXT = 0x22;
+#endif
+#ifndef VK_END
+constexpr int VK_END = 0x23;
+#endif
+#ifndef VK_HOME
+constexpr int VK_HOME = 0x24;
+#endif
+#ifndef VK_LEFT
+constexpr int VK_LEFT = 0x25;
+#endif
+#ifndef VK_UP
+constexpr int VK_UP = 0x26;
+#endif
+#ifndef VK_RIGHT
+constexpr int VK_RIGHT = 0x27;
+#endif
+#ifndef VK_DOWN
+constexpr int VK_DOWN = 0x28;
+#endif
 constexpr UINT MB_OK = 0x00000000;
 constexpr UINT MB_OKCANCEL = 0x00000001;
 constexpr UINT MB_YESNO = 0x00000004;
@@ -1771,7 +1850,6 @@ inline LPWSTR * CommandLineToArgvW(wchar_t const *, int * count)
 inline HRESULT OleInitialize(void *) { return(S_OK); }
 inline void OleUninitialize() {}
 inline HWND FindWindow(char const *, char const *) { return(nullptr); }
-inline BOOL SetForegroundWindow(HWND) { return(TRUE); }
 
 inline void _makepath(char * path, char const *, char const * directory, char const * filename, char const * extension)
 {
@@ -1833,6 +1911,7 @@ HWND CreateDialogIndirectParam(HINSTANCE instance, LPCDLGTEMPLATE dialog_templat
 HWND CreateDialogParam(HINSTANCE instance, LPCSTR template_name, HWND parent, DLGPROC procedure, LPARAM parameter);
 INT_PTR DialogBoxParam(HINSTANCE instance, LPCSTR template_name, HWND parent, DLGPROC procedure, LPARAM parameter);
 BOOL EndDialog(HWND dialog, INT_PTR result);
+LRESULT DefDlgProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 BOOL EnumChildWindows(HWND parent, WNDENUMPROC procedure, LPARAM parameter);
 HWND GetDlgItem(HWND dialog, int identifier);
 HWND GetNextDlgTabItem(HWND dialog, HWND control, BOOL previous);
