@@ -426,7 +426,7 @@ fixed_exclusions:
       - { file: code/wdtsel.cpp, function: Selection::Pick_Territory, expression: KN_NONE }
       - { file: code/wdtsel.cpp, function: Selection::Pick_Territory, expression: KN_LMOUSE }
     reason: World Domination Tour territory-screen polling and hit-testing.
-  - site: { file: code/winstub.cpp, function: Create_Main_Window, expression: VK_M }
+  - site: { file: code/winstub.cpp, function: Create_Main_Window, expression: VK_M, guard: else(defined(OPENTS_MACOS)) }
     reason: Registers a Windows hotkey that has no WM_HOTKEY handler in the current source tree.
 
 launch_options:

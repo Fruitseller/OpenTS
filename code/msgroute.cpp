@@ -162,9 +162,11 @@ bool Route_Mouse_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		return(false);
 	}
 
+#ifndef OPENTS_MACOS
 	if (!Video_Scaling_Active()) {
 		return(false);
 	}
+#endif
 
 	POINT point;
 	point.x = GET_X_LPARAM(lparam);

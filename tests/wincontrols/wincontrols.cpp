@@ -60,6 +60,13 @@ BOOL InvalidateRect(HWND, RECT const *, BOOL) { return(TRUE); }
 int GetSystemMetrics(int) { return(0); }
 BOOL OpenTSMacOS_Get_Native_Window_Rect(HWND, RECT *) { return(FALSE); }
 BOOL OpenTSMacOS_Move_Native_Window(HWND, int, int, int, int, BOOL) { return(FALSE); }
+BOOL OpenTSMacOS_Client_To_Screen(HWND, POINT *) { return(TRUE); }
+BOOL OpenTSMacOS_Screen_To_Client(HWND, POINT *) { return(TRUE); }
+HWND OpenTSMacOS_Get_Main_Native_Window(void) { return(nullptr); }
+BOOL ClientToScreen(HWND window, POINT * point) { return(OpenTSMacOS_Control_Point_Transform(window, point, TRUE)); }
+BOOL ScreenToClient(HWND window, POINT * point) { return(OpenTSMacOS_Control_Point_Transform(window, point, FALSE)); }
+HWND SetFocus(HWND window) { return(OpenTSMacOS_Set_Control_Focus(window)); }
+SHORT GetAsyncKeyState(int) { return(0); }
 
 namespace
 {
@@ -276,6 +283,105 @@ namespace
 		Check(CreateDialogParam(nullptr, MAKEINTRESOURCE(9999), nullptr, nullptr, 0) == nullptr,
 			"an unknown template creates no dialog");
 	}
+
+	void Test_Dialog_Hierarchy_And_Navigation(void)
+	{
+		HWND const dlg1 = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, nullptr, 0);
+		HWND const dlg2 = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, nullptr, 0);
+
+		Check(GetTopWindow(nullptr) == dlg1, "top window for null parent is the first dialog");
+		Check(GetWindow(nullptr, GW_CHILD) == dlg1, "GW_CHILD of null parent is the first dialog");
+		Check(GetWindow(dlg1, GW_HWNDNEXT) == dlg2, "GW_HWNDNEXT finds the sibling dialog");
+		Check(IsChild(nullptr, dlg1), "IsChild with null parent recognizes dialog");
+
+		BringWindowToTop(dlg2);
+		Check(GetTopWindow(nullptr) == dlg2, "BringWindowToTop moves target window to top");
+		Check(GetWindow(dlg2, GW_HWNDNEXT) == dlg1, "GW_HWNDNEXT reflects the updated order");
+
+		SetForegroundWindow(dlg1);
+		Check(GetTopWindow(nullptr) == dlg1, "SetForegroundWindow brings window to front");
+
+		DestroyWindow(dlg1);
+		DestroyWindow(dlg2);
+		Check(GetTopWindow(nullptr) == nullptr, "all top-level dialogs removed on destroy");
+	}
+
+	struct DialogProcRecorder
+	{
+		static inline int LastCommandId = -1;
+		static inline int CommandCount = 0;
+		static inline int LastDrawItemAction = -1;
+	};
+
+	INT_PTR CALLBACK Recording_Dlg_Proc(HWND, UINT message, WPARAM wparam, LPARAM lparam)
+	{
+		if (message == WM_COMMAND) {
+			DialogProcRecorder::LastCommandId = LOWORD(wparam);
+			DialogProcRecorder::CommandCount++;
+			return(TRUE);
+		}
+		if (message == WM_DRAWITEM) {
+			DRAWITEMSTRUCT const * dis = reinterpret_cast<DRAWITEMSTRUCT const *>(lparam);
+			if (dis) DialogProcRecorder::LastDrawItemAction = dis->itemAction;
+			return(TRUE);
+		}
+		return(FALSE);
+	}
+
+	void Test_Button_Clicks_And_Commands(void)
+	{
+		DialogProcRecorder::LastCommandId = -1;
+		DialogProcRecorder::CommandCount = 0;
+		DialogProcRecorder::LastDrawItemAction = -1;
+
+		HWND const dialog = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, Recording_Dlg_Proc, 0);
+		Check(dialog != nullptr, "recording dialog created");
+
+		HWND const btn = CreateWindowEx(0, "Button", "TestButton", WS_VISIBLE | BS_PUSHBUTTON,
+			10, 10, 80, 24, dialog, reinterpret_cast<HMENU>(100), nullptr, nullptr);
+		Check(btn != nullptr, "child button created");
+
+		// Simulate left click down
+		SendMessage(btn, WM_LBUTTONDOWN, 0, MAKELPARAM(5, 5));
+		Check(DialogProcRecorder::LastDrawItemAction == ODA_SELECT, "LBUTTONDOWN sends WM_DRAWITEM with ODA_SELECT");
+
+		// Simulate left click up inside rect
+		SendMessage(btn, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
+		Check(DialogProcRecorder::LastCommandId == 100, "LBUTTONUP inside button triggers WM_COMMAND with button ID");
+		Check(DialogProcRecorder::CommandCount == 1, "button click counted once");
+
+		// Checkbox test
+		HWND const chk = CreateWindowEx(0, "Button", "Check", WS_VISIBLE | BS_AUTOCHECKBOX,
+			10, 40, 80, 20, dialog, reinterpret_cast<HMENU>(101), nullptr, nullptr);
+		Check(SendMessage(chk, BM_GETCHECK, 0, 0) == BST_UNCHECKED, "checkbox initial state is unchecked");
+
+		SendMessage(chk, WM_LBUTTONDOWN, 0, MAKELPARAM(5, 5));
+		SendMessage(chk, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
+		Check(SendMessage(chk, BM_GETCHECK, 0, 0) == BST_CHECKED, "checkbox toggles to checked on click");
+		Check(DialogProcRecorder::LastCommandId == 101, "checkbox click sends WM_COMMAND to dialog");
+
+		// Coordinates test
+		SetWindowPos(dialog, nullptr, 100, 50, 300, 200, 0);
+		SetWindowPos(btn, nullptr, 20, 30, 80, 24, 0);
+		RECT btn_rect = {};
+		GetWindowRect(btn, &btn_rect);
+		Check(btn_rect.left == 120 && btn_rect.top == 80, "GetWindowRect calculates correct screen coordinates");
+
+		POINT map_pt = {120, 80};
+		MapWindowPoints(HWND_DESKTOP, dialog, &map_pt, 1);
+		Check(map_pt.x == 20 && map_pt.y == 30, "MapWindowPoints maps screen to dialog coordinates correctly");
+
+		// IsDialogMessage tests
+		MSG esc_msg = {dialog, WM_KEYDOWN, VK_ESCAPE, 0, 0, {0, 0}};
+		Check(IsDialogMessage(dialog, &esc_msg), "IsDialogMessage handles VK_ESCAPE");
+		Check(DialogProcRecorder::LastCommandId == IDCANCEL, "VK_ESCAPE dispatches IDCANCEL command");
+
+		MSG ret_msg = {dialog, WM_KEYDOWN, VK_RETURN, 0, 0, {0, 0}};
+		Check(IsDialogMessage(dialog, &ret_msg), "IsDialogMessage handles VK_RETURN");
+		Check(DialogProcRecorder::LastCommandId == IDOK, "VK_RETURN dispatches IDOK command");
+
+		DestroyWindow(dialog);
+	}
 }
 
 int main(void)
@@ -286,6 +392,8 @@ int main(void)
 	Test_Modal_Result();
 	Test_Immediate_End();
 	Test_Measuring_Fallback();
+	Test_Dialog_Hierarchy_And_Navigation();
+	Test_Button_Clicks_And_Commands();
 
 	std::printf("%s\n", Failures == 0 ? "all checks passed" : "checks FAILED");
 	return(Failures == 0 ? 0 : 1);

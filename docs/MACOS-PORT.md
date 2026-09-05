@@ -168,9 +168,13 @@ message loop that returns the `EndDialog` result. Template lookup searches
 every loaded resource library because the executable is not a PE module on
 macOS; the measuring dialog the executable would provide is mirrored in the
 shim. Shim control classes now use the Win32 mixed-case names the engine
-compares against. The `WinControls` test pins the template layout, the
-dialog-unit scaling, and the modal loop without game assets. Dialog-based
-screens past the menu still need runtime verification with real input.
+compares against. The control layer tracks the dialog hierarchy (`GetTopWindow`,
+`GetWindow`, `BringWindowToTop`), screen-space coordinate translation
+(`GetWindowRect`, `MapWindowPoints`), mouse-event routing to child controls,
+button and checkbox state changes, and keyboard navigation in `IsDialogMessage`
+(`VK_RETURN`, `VK_ESCAPE`, `VK_TAB`). The `WinControls` test pins the template
+layout, dialog-unit scaling, hierarchy traversal, button and checkbox clicks,
+keyboard commands, and the modal loop without game assets.
 
 The macOS window layer forces activation only until AppKit reports that the
 window became key. Later application switches do not pull the game back into

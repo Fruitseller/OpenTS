@@ -527,6 +527,11 @@ void * OpenTSMacOS_Native_Window_Handle(HWND window)
 	return(window);
 }
 
+HWND OpenTSMacOS_Get_Main_Native_Window(void)
+{
+	return((__bridge HWND)MainNativeWindow);
+}
+
 void OpenTSMacOS_Pump_Events(void)
 {
 	bool quit_requested = false;
@@ -567,20 +572,28 @@ void OpenTSMacOS_Pump_Events(void)
 
 BOOL OpenTSMacOS_Get_Client_Rect(HWND window, RECT * rectangle)
 {
-	if (window == nullptr || rectangle == nullptr) {
+	if (rectangle == nullptr) {
 		return(FALSE);
 	}
-	NSRect const bounds = [(__bridge NSWindow *)window contentView].bounds;
+	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (native_window == nil) {
+		return(FALSE);
+	}
+	NSRect const bounds = native_window.contentView.bounds;
 	*rectangle = {0, 0, static_cast<LONG>(bounds.size.width), static_cast<LONG>(bounds.size.height)};
 	return(TRUE);
 }
 
 BOOL OpenTSMacOS_Get_Window_Rect(HWND window, RECT * rectangle)
 {
-	if (window == nullptr || rectangle == nullptr) {
+	if (rectangle == nullptr) {
 		return(FALSE);
 	}
-	NSRect const frame = [(__bridge NSWindow *)window frame];
+	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (native_window == nil) {
+		return(FALSE);
+	}
+	NSRect const frame = native_window.frame;
 	CGFloat const screen_top = NSMaxY(NSScreen.mainScreen.frame);
 	*rectangle = {static_cast<LONG>(frame.origin.x),
 		static_cast<LONG>(screen_top - NSMaxY(frame)),
@@ -591,10 +604,13 @@ BOOL OpenTSMacOS_Get_Window_Rect(HWND window, RECT * rectangle)
 
 BOOL OpenTSMacOS_Client_To_Screen(HWND window, POINT * point)
 {
-	if (window == nullptr || point == nullptr) {
+	if (point == nullptr) {
 		return(FALSE);
 	}
-	NSWindow * native_window = (__bridge NSWindow *)window;
+	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (native_window == nil) {
+		return(FALSE);
+	}
 	NSView * view = native_window.contentView;
 	NSPoint native_point = NSMakePoint(point->x, view.bounds.size.height - point->y);
 	native_point = [view convertPoint:native_point toView:nil];
@@ -606,10 +622,13 @@ BOOL OpenTSMacOS_Client_To_Screen(HWND window, POINT * point)
 
 BOOL OpenTSMacOS_Screen_To_Client(HWND window, POINT * point)
 {
-	if (window == nullptr || point == nullptr) {
+	if (point == nullptr) {
 		return(FALSE);
 	}
-	NSWindow * native_window = (__bridge NSWindow *)window;
+	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (native_window == nil) {
+		return(FALSE);
+	}
 	NSView * view = native_window.contentView;
 	NSPoint native_point = NSMakePoint(point->x, NSMaxY(NSScreen.mainScreen.frame) - point->y);
 	native_point = [native_window convertPointFromScreen:native_point];
@@ -1028,7 +1047,6 @@ HWND SetFocus(HWND window)
 }
 
 HMENU GetMenu(HWND) { return(nullptr); }
-BOOL IsDialogMessage(HWND, MSG *) { return(FALSE); }
 int TranslateAccelerator(HWND, HACCEL, MSG *) { return(0); }
 
 int GetWindowText(HWND window, char * text, int size)
