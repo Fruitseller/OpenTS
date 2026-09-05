@@ -9,6 +9,7 @@
 
 #include "wincompat.h"
 #include "commctrl.h"
+#include "macoswindow.h"
 
 #include <memory>
 
@@ -53,6 +54,7 @@ namespace
 	std::unordered_map<HWND, std::unique_ptr<ControlWindow>> Controls;
 	std::unordered_map<std::string, WNDPROC> Classes;
 	std::unordered_map<std::uint64_t, std::shared_ptr<std::atomic<bool>>> Timers;
+	std::vector<HWND> MainWindowChildren;
 	HWND FocusWindow = nullptr;
 	HWND CaptureWindow = nullptr;
 
@@ -67,6 +69,8 @@ namespace
 		HWND const handle = window.get();
 		if (ControlWindow * parent = Find_Control(window->Parent)) {
 			parent->Children.push_back(handle);
+		} else {
+			MainWindowChildren.push_back(handle);
 		}
 		Controls.emplace(handle, std::move(window));
 		return(handle);
@@ -94,7 +98,7 @@ namespace
 		return(index);
 	}
 
-	LRESULT Base_Control_Message(ControlWindow & control, UINT message, WPARAM wparam, LPARAM lparam)
+	LRESULT Base_Control_Message(HWND window, ControlWindow & control, UINT message, WPARAM wparam, LPARAM lparam)
 	{
 		Infer_Control_Class(control, message);
 		if (message == WM_USER + 1) {
@@ -231,12 +235,79 @@ namespace
 				control.RangeMinimum = static_cast<int>(wparam); control.RangeMaximum = static_cast<int>(lparam); return(0);
 			case TBM_SETRANGE:
 				control.RangeMinimum = static_cast<SHORT>(LOWORD(lparam)); control.RangeMaximum = static_cast<SHORT>(HIWORD(lparam)); return(0);
+			case TBM_SETRANGEMIN:
+				control.RangeMinimum = static_cast<int>(lparam);
+				return(0);
+			case TBM_SETRANGEMAX:
+				control.RangeMaximum = static_cast<int>(lparam);
+				return(0);
 			case SBM_SETSCROLLINFO: {
 				auto const * info = reinterpret_cast<SCROLLINFO const *>(lparam);
 				if (info) { control.RangeMinimum = info->nMin; control.RangeMaximum = info->nMax; control.Position = info->nPos; }
 				return(control.Position);
 			}
-			case WM_NCHITTEST: return(HTCLIENT);
+			case BM_SETSTATE:
+				control.CheckState = wparam ? BST_PUSHED : BST_UNCHECKED;
+				InvalidateRect(window, nullptr, FALSE);
+				return(0);
+			case BM_CLICK:
+				if (control.Parent) {
+					SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, BN_CLICKED), reinterpret_cast<LPARAM>(window));
+				}
+				return(0);
+			case WM_LBUTTONDOWN: {
+				SetCapture(window);
+				control.CheckState = BST_PUSHED;
+				if (control.Parent) {
+					DRAWITEMSTRUCT dis{};
+					dis.CtlType = ODT_BUTTON;
+					dis.CtlID = static_cast<UINT>(control.Identifier);
+					dis.itemAction = ODA_SELECT;
+					dis.itemState = ODS_SELECTED;
+					dis.hwndItem = window;
+					dis.rcItem = {0, 0, control.Rectangle.right - control.Rectangle.left, control.Rectangle.bottom - control.Rectangle.top};
+					SendMessage(control.Parent, WM_DRAWITEM, control.Identifier, reinterpret_cast<LPARAM>(&dis));
+				}
+				InvalidateRect(window, nullptr, FALSE);
+				return(0);
+			}
+			case WM_LBUTTONUP: {
+				if (GetCapture() == window) {
+					ReleaseCapture();
+				}
+				control.CheckState = BST_UNCHECKED;
+				if (control.Parent) {
+					DRAWITEMSTRUCT dis{};
+					dis.CtlType = ODT_BUTTON;
+					dis.CtlID = static_cast<UINT>(control.Identifier);
+					dis.itemAction = ODA_SELECT;
+					dis.itemState = 0;
+					dis.hwndItem = window;
+					dis.rcItem = {0, 0, control.Rectangle.right - control.Rectangle.left, control.Rectangle.bottom - control.Rectangle.top};
+					SendMessage(control.Parent, WM_DRAWITEM, control.Identifier, reinterpret_cast<LPARAM>(&dis));
+				}
+				InvalidateRect(window, nullptr, FALSE);
+				POINT pt = {static_cast<SHORT>(LOWORD(lparam)), static_cast<SHORT>(HIWORD(lparam))};
+				RECT rc = {0, 0, control.Rectangle.right - control.Rectangle.left, control.Rectangle.bottom - control.Rectangle.top};
+				if (PtInRect(&rc, pt) && control.Parent) {
+					if (control.ClassName == "Button" && (control.Style & (BS_CHECKBOX | BS_AUTOCHECKBOX | BS_3STATE | BS_AUTO3STATE))) {
+						control.CheckState = (control.CheckState == BST_CHECKED) ? BST_UNCHECKED : BST_CHECKED;
+						InvalidateRect(window, nullptr, FALSE);
+						SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, control.CheckState), reinterpret_cast<LPARAM>(window));
+					} else {
+						SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, BN_CLICKED), reinterpret_cast<LPARAM>(window));
+					}
+				}
+				return(0);
+			}
+			case WM_NCHITTEST:
+				if (control.ClassName == "Button" && (control.Style & BS_GROUPBOX) == BS_GROUPBOX) {
+					return(HTTRANSPARENT);
+				}
+				if (control.ClassName == "Static" && !(control.Style & SS_NOTIFY)) {
+					return(HTTRANSPARENT);
+				}
+				return(HTCLIENT);
 			default: return(0);
 		}
 	}
@@ -427,16 +498,39 @@ LRESULT OpenTSMacOS_Send_Control_Message(HWND window, UINT message, WPARAM wpara
 	std::lock_guard lock(ControlMutex);
 	ControlWindow * control = Find_Control(window);
 	if (!control) return(0);
-	if (control->DialogProcedure) return(control->DialogProcedure(window, message, wparam, lparam));
 	if (control->Procedure && control->Procedure != DefWindowProc) return(control->Procedure(window, message, wparam, lparam));
-	return(Base_Control_Message(*control, message, wparam, lparam));
+	return(Base_Control_Message(window, *control, message, wparam, lparam));
 }
 
 LRESULT OpenTSMacOS_Def_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
 	std::lock_guard lock(ControlMutex);
 	ControlWindow * control = Find_Control(window);
-	return(control ? Base_Control_Message(*control, message, wparam, lparam) : 0);
+	return(control ? Base_Control_Message(window, *control, message, wparam, lparam) : 0);
+}
+
+LRESULT DefDlgProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
+{
+	ControlWindow * control = nullptr;
+	DLGPROC dlg_proc = nullptr;
+	{
+		std::lock_guard lock(ControlMutex);
+		control = Find_Control(window);
+		if (!control) return(0);
+		dlg_proc = control->DialogProcedure;
+	}
+
+	if (dlg_proc) {
+		INT_PTR const handled = dlg_proc(window, message, wparam, lparam);
+		if (handled) {
+			return(handled);
+		}
+	}
+
+	std::lock_guard lock(ControlMutex);
+	control = Find_Control(window);
+	if (!control) return(0);
+	return(Base_Control_Message(window, *control, message, wparam, lparam));
 }
 
 LRESULT CallWindowProc(WNDPROC procedure, HWND window, UINT message, WPARAM wparam, LPARAM lparam)
@@ -533,6 +627,7 @@ HWND CreateDialogIndirectParam(HINSTANCE, LPCDLGTEMPLATE dialog_template, HWND p
 	dialog->Text = parsed.Title;
 	dialog->Visible = (parsed.Style & WS_VISIBLE) != 0;
 	dialog->Enabled = (parsed.Style & WS_DISABLED) == 0;
+	dialog->Procedure = DefDlgProc;
 	dialog->DialogProcedure = procedure;
 	HWND const handle = Add_Control(std::move(dialog));
 	HWND first_stop = nullptr;
@@ -630,6 +725,8 @@ BOOL DestroyWindow(HWND window)
 	else if (control->Procedure && control->Procedure != DefWindowProc) control->Procedure(window, WM_DESTROY, 0, 0);
 	if (ControlWindow * parent = Find_Control(control->Parent)) {
 		parent->Children.erase(std::remove(parent->Children.begin(), parent->Children.end(), window), parent->Children.end());
+	} else {
+		MainWindowChildren.erase(std::remove(MainWindowChildren.begin(), MainWindowChildren.end(), window), MainWindowChildren.end());
 	}
 	if (FocusWindow == window) FocusWindow = nullptr;
 	if (CaptureWindow == window) CaptureWindow = nullptr;
@@ -668,10 +765,17 @@ HWND GetNextDlgTabItem(HWND dialog, HWND control, BOOL previous)
 BOOL EnumChildWindows(HWND parent, WNDENUMPROC procedure, LPARAM parameter)
 {
 	if (!procedure) return(FALSE);
-	std::lock_guard lock(ControlMutex);
-	ControlWindow * control = Find_Control(parent);
-	if (!control) return(FALSE);
-	auto const children = control->Children;
+	std::vector<HWND> children;
+	{
+		std::lock_guard lock(ControlMutex);
+		if (parent == nullptr || !OpenTSMacOS_Is_Control_Window(parent)) {
+			children = MainWindowChildren;
+		} else if (ControlWindow * control = Find_Control(parent)) {
+			children = control->Children;
+		} else {
+			return(FALSE);
+		}
+	}
 	for (HWND child : children) {
 		if (!procedure(child, parameter)) return(FALSE);
 		EnumChildWindows(child, procedure, parameter);
@@ -714,6 +818,9 @@ BOOL IsWindow(HWND window)
 BOOL IsChild(HWND parent, HWND window)
 {
 	std::lock_guard lock(ControlMutex);
+	if (parent == nullptr || !OpenTSMacOS_Is_Control_Window(parent)) {
+		return(Find_Control(window) != nullptr);
+	}
 	for (ControlWindow * control = Find_Control(window); control; control = Find_Control(control->Parent)) {
 		if (control->Parent == parent) return(TRUE);
 	}
@@ -723,11 +830,24 @@ BOOL IsChild(HWND parent, HWND window)
 BOOL ShowWindow(HWND window, int command)
 {
 	std::lock_guard lock(ControlMutex);
-	if (ControlWindow * control = Find_Control(window)) { control->Visible = command != SW_HIDE; return(TRUE); }
+	if (ControlWindow * control = Find_Control(window)) {
+		bool const was_visible = control->Visible;
+		control->Visible = command != SW_HIDE;
+		if (control->Visible && !was_visible) {
+			RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+		}
+		return(was_visible);
+	}
 	return(window != nullptr);
 }
 
-BOOL UpdateWindow(HWND window) { return(InvalidateRect(window, nullptr, FALSE)); }
+BOOL UpdateWindow(HWND window)
+{
+	if (OpenTSMacOS_Is_Control_Window(window)) {
+		return(RedrawWindow(window, nullptr, nullptr, RDW_UPDATENOW | RDW_ALLCHILDREN));
+	}
+	return(InvalidateRect(window, nullptr, FALSE));
+}
 BOOL CloseWindow(HWND window) { return(ShowWindow(window, SW_HIDE)); }
 HWND SetCapture(HWND window) { HWND const previous = CaptureWindow; CaptureWindow = window; return(previous); }
 HWND GetCapture(void) { return(CaptureWindow); }
@@ -752,23 +872,32 @@ HWND GetParent(HWND window)
 HWND GetWindow(HWND window, UINT command)
 {
 	std::lock_guard lock(ControlMutex);
+	if (window == nullptr || !OpenTSMacOS_Is_Control_Window(window)) {
+		if (command == GW_CHILD) return(MainWindowChildren.empty() ? nullptr : MainWindowChildren.front());
+		return(nullptr);
+	}
 	ControlWindow * control = Find_Control(window);
 	if (!control) return(nullptr);
 	if (command == GW_CHILD) return(control->Children.empty() ? nullptr : control->Children.front());
+	if (command == GW_OWNER) return(control->Parent);
+
 	ControlWindow * parent = Find_Control(control->Parent);
-	if (!parent) return(command == GW_OWNER ? control->Parent : nullptr);
-	auto const found = std::find(parent->Children.begin(), parent->Children.end(), window);
-	if (found == parent->Children.end()) return(nullptr);
-	if (command == GW_HWNDNEXT && found + 1 != parent->Children.end()) return(*(found + 1));
-	if (command == GW_HWNDPREV && found != parent->Children.begin()) return(*(found - 1));
-	if (command == GW_HWNDFIRST) return(parent->Children.front());
-	if (command == GW_HWNDLAST) return(parent->Children.back());
+	std::vector<HWND> const & siblings = parent ? parent->Children : MainWindowChildren;
+	auto const found = std::find(siblings.begin(), siblings.end(), window);
+	if (found == siblings.end()) return(nullptr);
+	if (command == GW_HWNDNEXT && found + 1 != siblings.end()) return(*(found + 1));
+	if (command == GW_HWNDPREV && found != siblings.begin()) return(*(found - 1));
+	if (command == GW_HWNDFIRST) return(siblings.front());
+	if (command == GW_HWNDLAST) return(siblings.back());
 	return(nullptr);
 }
 
 HWND GetTopWindow(HWND parent)
 {
 	std::lock_guard lock(ControlMutex);
+	if (parent == nullptr || !OpenTSMacOS_Is_Control_Window(parent)) {
+		return(MainWindowChildren.empty() ? nullptr : MainWindowChildren.front());
+	}
 	ControlWindow * control = Find_Control(parent);
 	return(control && !control->Children.empty() ? control->Children.front() : nullptr);
 }
@@ -827,38 +956,123 @@ BOOL OpenTSMacOS_Get_Control_Rect(HWND window, RECT * rectangle, BOOL client)
 BOOL OpenTSMacOS_Control_Point_Transform(HWND window, POINT * point, BOOL to_screen)
 {
 	if (!point) return(FALSE);
-	std::lock_guard lock(ControlMutex);
-	for (ControlWindow * control = Find_Control(window); control; control = Find_Control(control->Parent)) {
-		point->x += to_screen ? control->Rectangle.left : -control->Rectangle.left;
-		point->y += to_screen ? control->Rectangle.top : -control->Rectangle.top;
+	HWND root_native_window = nullptr;
+	std::vector<POINT> offsets;
+	{
+		std::lock_guard lock(ControlMutex);
+		for (ControlWindow * control = Find_Control(window); control; control = Find_Control(control->Parent)) {
+			offsets.push_back({control->Rectangle.left, control->Rectangle.top});
+			if (control->Parent && !OpenTSMacOS_Is_Control_Window(control->Parent)) {
+				root_native_window = control->Parent;
+			}
+		}
 	}
-	return(TRUE);
+	if (!root_native_window) {
+		root_native_window = OpenTSMacOS_Get_Main_Native_Window();
+	}
+
+	if (to_screen) {
+		for (POINT const & offset : offsets) {
+			point->x += offset.x;
+			point->y += offset.y;
+		}
+		return(OpenTSMacOS_Client_To_Screen(root_native_window, point));
+	} else {
+		if (!OpenTSMacOS_Screen_To_Client(root_native_window, point)) {
+			return(FALSE);
+		}
+		for (POINT const & offset : offsets) {
+			point->x -= offset.x;
+			point->y -= offset.y;
+		}
+		return(TRUE);
+	}
 }
 
 BOOL GetWindowRect(HWND window, RECT * rectangle)
 {
-	return(OpenTSMacOS_Is_Control_Window(window)
-		? OpenTSMacOS_Get_Control_Rect(window, rectangle, FALSE)
-		: OpenTSMacOS_Get_Native_Window_Rect(window, rectangle));
+	if (!rectangle) return(FALSE);
+	if (!OpenTSMacOS_Is_Control_Window(window)) {
+		return(OpenTSMacOS_Get_Native_Window_Rect(window, rectangle));
+	}
+	POINT pt = {0, 0};
+	ClientToScreen(window, &pt);
+	RECT client_rect = {};
+	OpenTSMacOS_Get_Control_Rect(window, &client_rect, TRUE);
+	int const width = client_rect.right - client_rect.left;
+	int const height = client_rect.bottom - client_rect.top;
+	rectangle->left = pt.x;
+	rectangle->top = pt.y;
+	rectangle->right = pt.x + width;
+	rectangle->bottom = pt.y + height;
+	return(TRUE);
 }
 
 BOOL MoveWindow(HWND window, int x, int y, int width, int height, BOOL repaint)
 {
-	std::lock_guard lock(ControlMutex);
-	ControlWindow * control = Find_Control(window);
-	if (!control) return(OpenTSMacOS_Move_Native_Window(window, x, y, width, height, repaint));
-	control->Rectangle = {x, y, x + width, y + height};
-	if (repaint) InvalidateRect(window, nullptr, FALSE);
-	return(TRUE);
+	return(SetWindowPos(window, nullptr, x, y, width, height, repaint ? 0 : SWP_NOREDRAW));
 }
 
-BOOL SetWindowPos(HWND window, HWND, int x, int y, int width, int height, UINT flags)
+BOOL SetWindowPos(HWND window, HWND insert_after, int x, int y, int width, int height, UINT flags)
 {
-	RECT rectangle = {};
-	if (!GetWindowRect(window, &rectangle)) return(FALSE);
-	if (flags & SWP_NOMOVE) { x = rectangle.left; y = rectangle.top; }
-	if (flags & SWP_NOSIZE) { width = rectangle.right - rectangle.left; height = rectangle.bottom - rectangle.top; }
-	return(MoveWindow(window, x, y, width, height, TRUE));
+	std::lock_guard lock(ControlMutex);
+	ControlWindow * control = Find_Control(window);
+	if (!control) return(FALSE);
+
+	if (flags & SWP_NOMOVE) {
+		x = control->Rectangle.left;
+		y = control->Rectangle.top;
+	}
+	if (flags & SWP_NOSIZE) {
+		width = control->Rectangle.right - control->Rectangle.left;
+		height = control->Rectangle.bottom - control->Rectangle.top;
+	}
+	control->Rectangle = {x, y, x + width, y + height};
+
+	if (flags & SWP_SHOWWINDOW) {
+		control->Visible = true;
+	} else if (flags & SWP_HIDEWINDOW) {
+		control->Visible = false;
+	}
+
+	if (!(flags & SWP_NOZORDER)) {
+		if (insert_after == HWND_TOP || insert_after == nullptr) {
+			if (ControlWindow * parent = Find_Control(control->Parent)) {
+				auto & children = parent->Children;
+				auto it = std::find(children.begin(), children.end(), window);
+				if (it != children.end()) {
+					children.erase(it);
+					children.insert(children.begin(), window);
+				}
+			} else {
+				auto it = std::find(MainWindowChildren.begin(), MainWindowChildren.end(), window);
+				if (it != MainWindowChildren.end()) {
+					MainWindowChildren.erase(it);
+					MainWindowChildren.insert(MainWindowChildren.begin(), window);
+				}
+			}
+		} else if (insert_after == HWND_BOTTOM) {
+			if (ControlWindow * parent = Find_Control(control->Parent)) {
+				auto & children = parent->Children;
+				auto it = std::find(children.begin(), children.end(), window);
+				if (it != children.end()) {
+					children.erase(it);
+					children.push_back(window);
+				}
+			} else {
+				auto it = std::find(MainWindowChildren.begin(), MainWindowChildren.end(), window);
+				if (it != MainWindowChildren.end()) {
+					MainWindowChildren.erase(it);
+					MainWindowChildren.push_back(window);
+				}
+			}
+		}
+	}
+
+	if (!(flags & SWP_NOREDRAW)) {
+		RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+	}
+	return(TRUE);
 }
 
 BOOL SetRect(RECT * rectangle, int left, int top, int right, int bottom)
@@ -878,8 +1092,12 @@ int MapWindowPoints(HWND source, HWND destination, POINT * points, UINT count)
 {
 	if (!points) return(0);
 	for (UINT index = 0; index < count; ++index) {
-		if (source && OpenTSMacOS_Is_Control_Window(source)) OpenTSMacOS_Control_Point_Transform(source, &points[index], TRUE);
-		if (destination && OpenTSMacOS_Is_Control_Window(destination)) OpenTSMacOS_Control_Point_Transform(destination, &points[index], FALSE);
+		if (source != nullptr && source != HWND_DESKTOP) {
+			ClientToScreen(source, &points[index]);
+		}
+		if (destination != nullptr && destination != HWND_DESKTOP) {
+			ScreenToClient(destination, &points[index]);
+		}
 	}
 	return(0);
 }
@@ -907,7 +1125,12 @@ BOOL GetMonitorInfo(HMONITOR, MONITORINFO * information)
 	return(TRUE);
 }
 
-BOOL OpenTSMacOS_Invalidate_Control(HWND window) { return(OpenTSMacOS_Is_Control_Window(window)); }
+BOOL OpenTSMacOS_Invalidate_Control(HWND window)
+{
+	if (!OpenTSMacOS_Is_Control_Window(window)) return(FALSE);
+	PostMessage(window, WM_PAINT, 0, 0);
+	return(TRUE);
+}
 
 BOOL GetUpdateRect(HWND window, RECT * rectangle, BOOL)
 {
@@ -945,8 +1168,62 @@ HWND WindowFromPoint(POINT point)
 }
 
 BOOL AdjustWindowRectEx(RECT * rectangle, DWORD, BOOL, DWORD) { return(rectangle != nullptr); }
-BOOL RedrawWindow(HWND window, RECT const *, HANDLE, UINT) { return(InvalidateRect(window, nullptr, TRUE)); }
-BOOL BringWindowToTop(HWND window) { return(window != nullptr); }
+BOOL RedrawWindow(HWND window, RECT const * rectangle, HANDLE, UINT flags)
+{
+	if (!window) return(FALSE);
+	if (OpenTSMacOS_Is_Control_Window(window)) {
+		if (flags & RDW_UPDATENOW) {
+			SendMessage(window, WM_PAINT, 0, 0);
+			if (flags & RDW_ALLCHILDREN) {
+				std::vector<HWND> children;
+				{
+					std::lock_guard lock(ControlMutex);
+					if (ControlWindow * control = Find_Control(window)) {
+						children = control->Children;
+					}
+				}
+				for (HWND child : children) {
+					if (IsWindowVisible(child)) {
+						RedrawWindow(child, nullptr, nullptr, flags);
+					}
+				}
+			}
+		} else {
+			PostMessage(window, WM_PAINT, 0, 0);
+		}
+		return(TRUE);
+	}
+	return(InvalidateRect(window, rectangle, TRUE));
+}
+
+BOOL BringWindowToTop(HWND window)
+{
+	std::lock_guard lock(ControlMutex);
+	ControlWindow * control = Find_Control(window);
+	if (!control) return(FALSE);
+	if (ControlWindow * parent = Find_Control(control->Parent)) {
+		auto & children = parent->Children;
+		auto it = std::find(children.begin(), children.end(), window);
+		if (it != children.end()) {
+			children.erase(it);
+			children.insert(children.begin(), window);
+		}
+	} else {
+		auto it = std::find(MainWindowChildren.begin(), MainWindowChildren.end(), window);
+		if (it != MainWindowChildren.end()) {
+			MainWindowChildren.erase(it);
+			MainWindowChildren.insert(MainWindowChildren.begin(), window);
+		}
+	}
+	return(TRUE);
+}
+
+BOOL SetForegroundWindow(HWND window)
+{
+	BringWindowToTop(window);
+	OpenTSMacOS_Set_Control_Focus(window);
+	return(TRUE);
+}
 int GetDlgCtrlID(HWND window) { return(static_cast<int>(GetWindowLongPtr(window, GWL_ID))); }
 
 UINT_PTR SetTimer(HWND window, UINT_PTR identifier, UINT interval, TIMERPROC procedure)
@@ -976,4 +1253,47 @@ BOOL KillTimer(HWND window, UINT_PTR identifier)
 	found->second->store(false);
 	Timers.erase(found);
 	return(TRUE);
+}
+
+BOOL IsDialogMessage(HWND dialog, MSG * message)
+{
+	if (!dialog || !message) return(FALSE);
+	if (!OpenTSMacOS_Is_Control_Window(dialog)) return(FALSE);
+
+	if (message->message != WM_KEYDOWN && message->message != WM_KEYUP && message->message != WM_CHAR) {
+		return(FALSE);
+	}
+
+	if (message->message == WM_KEYDOWN) {
+		switch (message->wParam) {
+			case VK_ESCAPE:
+				SendMessage(dialog, WM_COMMAND, MAKEWPARAM(IDCANCEL, BN_CLICKED), 0);
+				return(TRUE);
+			case VK_RETURN: {
+				HWND focus = GetFocus();
+				int id = IDOK;
+				if (focus && IsChild(dialog, focus)) {
+					int const ctrl_id = GetDlgCtrlID(focus);
+					if (ctrl_id > 0) id = ctrl_id;
+				}
+				SendMessage(dialog, WM_COMMAND, MAKEWPARAM(id, BN_CLICKED), reinterpret_cast<LPARAM>(focus));
+				return(TRUE);
+			}
+			case VK_TAB: {
+				bool const shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+				HWND focus = GetFocus();
+				if (!focus || !IsChild(dialog, focus)) {
+					focus = GetTopWindow(dialog);
+				}
+				HWND next = GetNextDlgTabItem(dialog, focus, shift ? TRUE : FALSE);
+				if (next) {
+					SetFocus(next);
+				}
+				return(TRUE);
+			}
+			default:
+				break;
+		}
+	}
+	return(FALSE);
 }
