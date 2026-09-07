@@ -9,6 +9,7 @@
 
 #include "wincompat.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -39,7 +40,7 @@ BOOL TranslateMessage(MSG const *) { return(TRUE); }
 
 LRESULT DispatchMessage(MSG const * message)
 {
-	return(message ? OpenTSMacOS_Send_Control_Message(message->hwnd, message->message, message->wParam, message->lParam) : 0);
+	return(message ? OpenTSMacOS_Dispatch_Control_Message(message->hwnd, message->message, message->wParam, message->lParam) : 0);
 }
 
 void PostQuitMessage(int exit_code) { PostMessage(nullptr, WM_QUIT, static_cast<WPARAM>(exit_code), 0); }
@@ -56,7 +57,7 @@ LRESULT DefWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 
 int GetWindowText(HWND window, char * text, int size) { return(OpenTSMacOS_Get_Control_Text(window, text, size)); }
 BOOL GetClientRect(HWND window, RECT * rectangle) { return(OpenTSMacOS_Get_Control_Rect(window, rectangle, TRUE)); }
-BOOL InvalidateRect(HWND, RECT const *, BOOL) { return(TRUE); }
+BOOL InvalidateRect(HWND window, RECT const *, BOOL) { return(OpenTSMacOS_Invalidate_Control(window)); }
 int GetSystemMetrics(int) { return(0); }
 BOOL OpenTSMacOS_Get_Native_Window_Rect(HWND, RECT *) { return(FALSE); }
 BOOL OpenTSMacOS_Move_Native_Window(HWND, int, int, int, int, BOOL) { return(FALSE); }
@@ -256,7 +257,10 @@ namespace
 	{
 		INT_PTR const result = DialogBoxParam(nullptr, MAKEINTRESOURCE(198), nullptr, Zero_Result_Dialog_Proc, 0);
 		Check(result == 0, "modal loop returns the EndDialog result, including zero");
-		Check(TestQueue.empty(), "modal loop consumed its messages");
+		Check(std::all_of(TestQueue.begin(), TestQueue.end(), [](MSG const & message) {
+			return(message.message == WM_PAINT && !OpenTSMacOS_Is_Control_Window(message.hwnd));
+		}), "modal loop leaves only stale paints for destroyed controls");
+		TestQueue.clear();
 	}
 
 	INT_PTR CALLBACK Immediate_End_Dialog_Proc(HWND window, UINT message, WPARAM, LPARAM)
@@ -337,7 +341,7 @@ namespace
 		HWND const dialog = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, Recording_Dlg_Proc, 0);
 		Check(dialog != nullptr, "recording dialog created");
 
-		HWND const btn = CreateWindowEx(0, "Button", "TestButton", WS_VISIBLE | BS_PUSHBUTTON,
+		HWND const btn = CreateWindowEx(0, "Button", "TestButton", WS_VISIBLE | BS_OWNERDRAW,
 			10, 10, 80, 24, dialog, reinterpret_cast<HMENU>(100), nullptr, nullptr);
 		Check(btn != nullptr, "child button created");
 
@@ -360,6 +364,10 @@ namespace
 		Check(SendMessage(chk, BM_GETCHECK, 0, 0) == BST_CHECKED, "checkbox toggles to checked on click");
 		Check(DialogProcRecorder::LastCommandId == 101, "checkbox click sends WM_COMMAND to dialog");
 
+		DialogProcRecorder::LastDrawItemAction = -1;
+		SendMessage(chk, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
+		Check(DialogProcRecorder::LastDrawItemAction == -1, "checkbox release does not send an owner-draw button state");
+
 		// Coordinates test
 		SetWindowPos(dialog, nullptr, 100, 50, 300, 200, 0);
 		SetWindowPos(btn, nullptr, 20, 30, 80, 24, 0);
@@ -380,6 +388,140 @@ namespace
 		Check(IsDialogMessage(dialog, &ret_msg), "IsDialogMessage handles VK_RETURN");
 		Check(DialogProcRecorder::LastCommandId == IDOK, "VK_RETURN dispatches IDOK command");
 
+		// ComboBox selection and dropped rect test
+		HWND const combo = CreateWindowEx(0, "ComboBox", "Default", WS_VISIBLE | CBS_DROPDOWNLIST,
+			10, 70, 100, 20, dialog, reinterpret_cast<HMENU>(102), nullptr, nullptr);
+		SendMessage(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>("GDI"));
+		SendMessage(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>("Nod"));
+		SendMessage(combo, CB_SETCURSEL, 1, 0);
+		Check(SendMessage(combo, CB_GETCURSEL, 0, 0) == 1, "ComboBox CB_SETCURSEL selects index 1");
+
+		char combo_text[32] = {};
+		GetWindowText(combo, combo_text, sizeof(combo_text));
+		Check(std::strcmp(combo_text, "Nod") == 0, "ComboBox GetWindowText returns selected item text");
+
+		RECT drop_rect = {};
+		SendMessage(combo, CB_GETDROPPEDCONTROLRECT, 0, reinterpret_cast<LPARAM>(&drop_rect));
+		RECT expected_combo_rect = {};
+		GetWindowRect(combo, &expected_combo_rect);
+		Check(expected_combo_rect.bottom - expected_combo_rect.top == 24, "ComboBox closed height is 24");
+		Check(drop_rect.left == expected_combo_rect.left && drop_rect.top == expected_combo_rect.top,
+			"CB_GETDROPPEDCONTROLRECT returns screen coordinates matching GetWindowRect");
+
+		HWND const combo2 = CreateWindowEx(0, "ComboBox", "Second", WS_VISIBLE | CBS_DROPDOWNLIST,
+			10, 100, 100, 80, dialog, reinterpret_cast<HMENU>(103), nullptr, nullptr);
+		RECT client_rect2 = {};
+		GetClientRect(combo2, &client_rect2);
+		Check(client_rect2.bottom - client_rect2.top == 24, "ComboBox GetClientRect returns closed height 24");
+		RECT window_rect2 = {};
+		GetWindowRect(combo2, &window_rect2);
+		Check(window_rect2.bottom - window_rect2.top == 24, "ComboBox GetWindowRect returns closed height 24");
+		RECT drop_rect2 = {};
+		SendMessage(combo2, CB_GETDROPPEDCONTROLRECT, 0, reinterpret_cast<LPARAM>(&drop_rect2));
+		Check(drop_rect2.bottom - drop_rect2.top == 80, "CB_GETDROPPEDCONTROLRECT returns dropped height 80");
+		Check(expected_combo_rect.bottom <= window_rect2.top, "Vertically adjacent ComboBoxes do not overlap");
+
+		SetWindowPos(combo2, nullptr, 10, 100, 100, 95, 0);
+		GetWindowRect(combo2, &window_rect2);
+		Check(window_rect2.bottom - window_rect2.top == 24, "SetWindowPos preserves ComboBox closed height 24");
+		SendMessage(combo2, CB_GETDROPPEDCONTROLRECT, 0, reinterpret_cast<LPARAM>(&drop_rect2));
+		Check(drop_rect2.bottom - drop_rect2.top == 95, "SetWindowPos updates dropped height to 95");
+
+		// Child window destruction and parent invalidation
+		HWND const child_win = CreateWindowEx(0, "Button", "Child", WS_VISIBLE, 5, 5, 20, 20, combo, nullptr, nullptr, nullptr);
+		Check(DestroyWindow(child_win), "DestroyWindow on child window succeeds");
+
+		DestroyWindow(dialog);
+	}
+
+	int PaintCount = 0;
+
+	LRESULT CALLBACK Repainting_Control_Proc(HWND window, UINT message, WPARAM, LPARAM)
+	{
+		if (message == WM_PAINT) {
+			++PaintCount;
+			InvalidateRect(window, nullptr, FALSE);
+			ValidateRect(window, nullptr);
+		}
+		return(0);
+	}
+
+	void Test_Paint_Queue_Drains(void)
+	{
+		TestQueue.clear();
+		HWND const button = CreateWindowEx(0, "Button", "Cancel", WS_VISIBLE | BS_OWNERDRAW,
+			0, 0, 80, 24, nullptr, nullptr, nullptr, nullptr);
+		SetWindowLongPtr(button, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(Repainting_Control_Proc));
+		PaintCount = 0;
+		InvalidateRect(button, nullptr, FALSE);
+		InvalidateRect(button, nullptr, FALSE);
+		for (int count = 0; count < 8 && !TestQueue.empty(); ++count) {
+			MSG message = {};
+			PeekMessage(&message, nullptr, 0, 0, PM_REMOVE);
+			DispatchMessage(&message);
+		}
+		Check(TestQueue.empty(), "validated owner-draw repaint lets the message pump finish");
+		Check(PaintCount == 1, "repeated invalidation produces one owner-draw repaint");
+		Check(!GetUpdateRect(button, nullptr, FALSE), "validated control has no pending update region");
+		SendMessage(button, WM_PAINT, 0, 0);
+		Check(PaintCount == 2, "explicit synchronous paint still reaches a validated control");
+		DestroyWindow(button);
+		TestQueue.clear();
+	}
+
+	void Test_Edit_Input(void)
+	{
+		HWND const dialog = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, Recording_Dlg_Proc, 0);
+		HWND const edit = CreateWindowEx(0, "Edit", "Player", WS_VISIBLE,
+			10, 10, 100, 24, dialog, reinterpret_cast<HMENU>(104), nullptr, nullptr);
+		SendMessage(edit, WM_LBUTTONDOWN, 0, MAKELPARAM(5, 5));
+		SendMessage(edit, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
+		Check(GetFocus() == edit, "clicking the name field gives it keyboard focus");
+		SendMessage(edit, EM_SETSEL, 0, -1);
+		SendMessage(edit, WM_CHAR, 'A', 0);
+		SendMessage(edit, WM_CHAR, 'B', 0);
+		char text[32] = {};
+		GetWindowText(edit, text, sizeof(text));
+		Check(std::strcmp(text, "AB") == 0, "typing replaces the selected player name");
+		SendMessage(edit, WM_CHAR, VK_BACK, 0);
+		GetWindowText(edit, text, sizeof(text));
+		Check(std::strcmp(text, "A") == 0, "backspace removes a character from the name");
+		SendMessage(edit, EM_SETLIMITTEXT, 2, 0);
+		SendMessage(edit, WM_CHAR, 'B', 0);
+		SendMessage(edit, WM_CHAR, 'C', 0);
+		GetWindowText(edit, text, sizeof(text));
+		Check(std::strcmp(text, "AB") == 0, "name input respects the configured text limit");
+		SendMessage(edit, WM_KEYDOWN, VK_HOME, 0);
+		SendMessage(edit, WM_KEYDOWN, VK_DELETE, 0);
+		GetWindowText(edit, text, sizeof(text));
+		Check(std::strcmp(text, "B") == 0, "Home and Delete edit the beginning of the name");
+		MSG enter = {edit, WM_KEYDOWN, VK_RETURN, 0, 0, {0, 0}};
+		IsDialogMessage(dialog, &enter);
+		Check(DialogProcRecorder::LastCommandId == IDOK, "Enter in the name field invokes the dialog default button");
+		DestroyWindow(dialog);
+	}
+
+	void Test_ZOrder_And_HitTesting(void)
+	{
+		HWND const dialog = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, nullptr, 0);
+		Check(dialog != nullptr, "dialog created for zorder test");
+
+		HWND const child1 = CreateWindowEx(0, "Button", "Child1", WS_VISIBLE, 10, 10, 50, 20, dialog, reinterpret_cast<HMENU>(1), nullptr, nullptr);
+		HWND const child2 = CreateWindowEx(0, "Button", "Child2", WS_VISIBLE, 10, 40, 50, 20, dialog, reinterpret_cast<HMENU>(2), nullptr, nullptr);
+		Check(GetTopWindow(dialog) == child1, "first created child is top of z-order");
+
+		MoveWindow(child1, 15, 15, 50, 20, TRUE);
+		MoveWindow(child2, 15, 45, 50, 20, TRUE);
+		Check(GetTopWindow(dialog) == child1, "MoveWindow preserves child z-order");
+
+		HWND const groupbox = CreateWindowEx(0, "Button", "Group", WS_VISIBLE | BS_GROUPBOX, 5, 5, 100, 100, dialog, reinterpret_cast<HMENU>(3), nullptr, nullptr);
+		Check(SendMessage(groupbox, WM_NCHITTEST, 0, 0) == HTTRANSPARENT, "BS_GROUPBOX returns HTTRANSPARENT for WM_NCHITTEST");
+
+		HWND const static_label = CreateWindowEx(0, "Static", "Label", WS_VISIBLE, 5, 110, 100, 20, dialog, reinterpret_cast<HMENU>(4), nullptr, nullptr);
+		Check(SendMessage(static_label, WM_NCHITTEST, 0, 0) == HTTRANSPARENT, "non-notify Static returns HTTRANSPARENT for WM_NCHITTEST");
+
+		Check(CallWindowProc(nullptr, child1, WM_NCHITTEST, 0, 0) == HTCLIENT, "CallWindowProc with null procedure falls back to DefWindowProc");
+
 		DestroyWindow(dialog);
 	}
 }
@@ -394,6 +536,9 @@ int main(void)
 	Test_Measuring_Fallback();
 	Test_Dialog_Hierarchy_And_Navigation();
 	Test_Button_Clicks_And_Commands();
+	Test_ZOrder_And_HitTesting();
+	Test_Edit_Input();
+	Test_Paint_Queue_Drains();
 
 	std::printf("%s\n", Failures == 0 ? "all checks passed" : "checks FAILED");
 	return(Failures == 0 ? 0 : 1);

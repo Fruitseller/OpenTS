@@ -247,15 +247,45 @@ namespace
 		KeyState[key] = !released;
 		LPARAM const lparam = was_down ? static_cast<LPARAM>(1u << 30) : 0;
 		bool const system_key = (event.modifierFlags & NSEventModifierFlagOption) != 0;
-		Queue_Message((__bridge HWND)event.window,
+		HWND const focus = GetFocus();
+		HWND const target = OpenTSMacOS_Is_Control_Window(focus) ? focus : (__bridge HWND)event.window;
+		Queue_Message(target,
 			system_key ? (released ? MessageSystemKeyUp : MessageSystemKeyDown)
 				: (released ? MessageKeyUp : MessageKeyDown), key, lparam);
+		if (!released && OpenTSMacOS_Is_Control_Window(focus) && !system_key
+			&& !(event.modifierFlags & (NSEventModifierFlagControl | NSEventModifierFlagCommand))) {
+			NSString * characters = event.characters;
+			for (NSUInteger index = 0; index < characters.length; ++index) {
+				unichar character = [characters characterAtIndex:index];
+				if (character == NSDeleteCharacter) character = VK_BACK;
+				if (character < 0xF700 || character > 0xF8FF) {
+					Queue_Message(target, WM_CHAR, static_cast<unsigned char>(OpenTSMacOS_To_CP1252(character)), lparam);
+				}
+			}
+		}
 	}
 
 	void Queue_Mouse_Event(NSView * view, NSEvent * event, UINT message)
 	{
 		POINT const point = Client_Point_For_Event(view, event);
-		Queue_Message((__bridge HWND)event.window, message, 0, Pack_Coordinates(point.x, point.y));
+		WPARAM wparam = 0;
+		NSUInteger const pressed = [NSEvent pressedMouseButtons];
+		if ((pressed & (1 << 0)) != 0 || message == MessageLeftButtonDown || message == MessageLeftButtonDoubleClick) {
+			wparam |= MK_LBUTTON;
+		}
+		if ((pressed & (1 << 1)) != 0 || message == MessageRightButtonDown || message == MessageRightButtonDoubleClick) {
+			wparam |= MK_RBUTTON;
+		}
+		if ((pressed & (1 << 2)) != 0 || message == MessageMiddleButtonDown || message == MessageMiddleButtonDoubleClick) {
+			wparam |= MK_MBUTTON;
+		}
+		if ((event.modifierFlags & NSEventModifierFlagShift) != 0) {
+			wparam |= MK_SHIFT;
+		}
+		if ((event.modifierFlags & NSEventModifierFlagControl) != 0) {
+			wparam |= MK_CONTROL;
+		}
+		Queue_Message((__bridge HWND)event.window, message, wparam, Pack_Coordinates(point.x, point.y));
 	}
 }
 
@@ -575,7 +605,10 @@ BOOL OpenTSMacOS_Get_Client_Rect(HWND window, RECT * rectangle)
 	if (rectangle == nullptr) {
 		return(FALSE);
 	}
-	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (OpenTSMacOS_Is_Control_Window(window)) {
+		return(OpenTSMacOS_Get_Control_Rect(window, rectangle, TRUE));
+	}
+	NSWindow * native_window = (window != nullptr && window == (__bridge HWND)MainNativeWindow) ? MainNativeWindow : MainNativeWindow;
 	if (native_window == nil) {
 		return(FALSE);
 	}
@@ -589,7 +622,10 @@ BOOL OpenTSMacOS_Get_Window_Rect(HWND window, RECT * rectangle)
 	if (rectangle == nullptr) {
 		return(FALSE);
 	}
-	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (OpenTSMacOS_Is_Control_Window(window)) {
+		return(OpenTSMacOS_Get_Control_Rect(window, rectangle, FALSE));
+	}
+	NSWindow * native_window = (window != nullptr && window == (__bridge HWND)MainNativeWindow) ? MainNativeWindow : MainNativeWindow;
 	if (native_window == nil) {
 		return(FALSE);
 	}
@@ -607,7 +643,10 @@ BOOL OpenTSMacOS_Client_To_Screen(HWND window, POINT * point)
 	if (point == nullptr) {
 		return(FALSE);
 	}
-	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (OpenTSMacOS_Is_Control_Window(window)) {
+		return(OpenTSMacOS_Control_Point_Transform(window, point, TRUE));
+	}
+	NSWindow * native_window = (window != nullptr && window == (__bridge HWND)MainNativeWindow) ? MainNativeWindow : MainNativeWindow;
 	if (native_window == nil) {
 		return(FALSE);
 	}
@@ -625,7 +664,10 @@ BOOL OpenTSMacOS_Screen_To_Client(HWND window, POINT * point)
 	if (point == nullptr) {
 		return(FALSE);
 	}
-	NSWindow * native_window = window != nullptr ? (__bridge NSWindow *)window : MainNativeWindow;
+	if (OpenTSMacOS_Is_Control_Window(window)) {
+		return(OpenTSMacOS_Control_Point_Transform(window, point, FALSE));
+	}
+	NSWindow * native_window = (window != nullptr && window == (__bridge HWND)MainNativeWindow) ? MainNativeWindow : MainNativeWindow;
 	if (native_window == nil) {
 		return(FALSE);
 	}
@@ -852,7 +894,7 @@ LRESULT DispatchMessage(MSG const * message)
 		return(0);
 	}
 	if (OpenTSMacOS_Is_Control_Window(message->hwnd)) {
-		return(OpenTSMacOS_Send_Control_Message(message->hwnd, message->message, message->wParam, message->lParam));
+		return(OpenTSMacOS_Dispatch_Control_Message(message->hwnd, message->message, message->wParam, message->lParam));
 	}
 	return(Windows_Procedure(message->hwnd, message->message, message->wParam, message->lParam));
 }
@@ -1021,8 +1063,6 @@ BOOL InvalidateRect(HWND window, RECT const *, BOOL)
 	return(TRUE);
 }
 
-BOOL ValidateRect(HWND, RECT const *) { return(TRUE); }
-
 HWND SetActiveWindow(HWND window)
 {
 	if (OpenTSMacOS_Is_Control_Window(window)) {
@@ -1043,7 +1083,7 @@ HWND SetFocus(HWND window)
 		NSWindow * native_window = (__bridge NSWindow *)window;
 		[native_window makeFirstResponder:native_window.contentView];
 	}
-	return(window);
+	return(OpenTSMacOS_Set_Control_Focus(window));
 }
 
 HMENU GetMenu(HWND) { return(nullptr); }
@@ -1129,6 +1169,18 @@ int MessageBoxIndirect(MSGBOXPARAMS const * parameters)
 }
 
 #ifdef OPENTS_MACOS_WINDOW_TEST
+bool OpenTSMacOS_Test_Text_Input(void)
+{
+	MessageQueue.clear();
+	NSEvent * event = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint
+		modifierFlags:0 timestamp:0 windowNumber:0 context:nil characters:@"a"
+		charactersIgnoringModifiers:@"a" isARepeat:NO keyCode:0];
+	Queue_Key_Event(event, false);
+	return(MessageQueue.size() == 2 && MessageQueue[0].hwnd == GetFocus()
+		&& MessageQueue[0].message == WM_KEYDOWN && MessageQueue[1].hwnd == GetFocus()
+		&& MessageQueue[1].message == WM_CHAR && MessageQueue[1].wParam == 'a');
+}
+
 bool OpenTSMacOS_Test_Focus_Activation(void)
 {
 	InitialActivationDone = false;

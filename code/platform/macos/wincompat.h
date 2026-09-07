@@ -317,6 +317,22 @@ struct LOGFONTA {
 using LOGFONT = LOGFONTA;
 struct HELPINFO { UINT cbSize; int iContextType; int iCtrlId; HANDLE hItemHandle; DWORD_PTR dwContextId; POINT MousePos; };
 struct WINDOWPOS { HWND hwnd; HWND hwndInsertAfter; int x, y, cx, cy; UINT flags; };
+struct CREATESTRUCTA {
+	LPVOID    lpCreateParams;
+	HINSTANCE hInstance;
+	HMENU     hMenu;
+	HWND      hwndParent;
+	int       cy;
+	int       cx;
+	int       y;
+	int       x;
+	LONG      style;
+	LPCSTR    lpszName;
+	LPCSTR    lpszClass;
+	DWORD     dwExStyle;
+};
+using CREATESTRUCT = CREATESTRUCTA;
+using LPCREATESTRUCT = CREATESTRUCTA *;
 struct OSVERSIONINFOA {
 	DWORD dwOSVersionInfoSize, dwMajorVersion, dwMinorVersion, dwBuildNumber, dwPlatformId;
 	CHAR szCSDVersion[128];
@@ -536,13 +552,30 @@ constexpr LONG WS_BORDER = 0x00800000L;
 constexpr LONG WS_TABSTOP = 0x00010000L;
 constexpr LONG ES_MULTILINE = 0x0004L;
 constexpr LONG ES_PASSWORD = 0x0020L;
+constexpr LONG ES_READONLY = 0x0800L;
 constexpr LONG SS_CENTER = 0x0001L;
 constexpr LONG SS_RIGHT = 0x0002L;
 constexpr LONG SS_NOTIFY = 0x0100L;
 constexpr UINT MK_LBUTTON = 0x0001;
+constexpr UINT MK_RBUTTON = 0x0002;
+constexpr UINT MK_SHIFT = 0x0004;
+constexpr UINT MK_CONTROL = 0x0008;
+constexpr UINT MK_MBUTTON = 0x0010;
+constexpr LONG CBS_SIMPLE = 0x0001L;
+constexpr LONG CBS_DROPDOWN = 0x0002L;
+constexpr LONG CBS_DROPDOWNLIST = 0x0003L;
+constexpr LONG CBS_OWNERDRAWFIXED = 0x0010L;
+constexpr LONG CBS_OWNERDRAWVARIABLE = 0x0020L;
+constexpr LONG CBS_AUTOHSCROLL = 0x0040L;
+constexpr LONG CBS_OEMCONVERT = 0x0080L;
+constexpr LONG CBS_SORT = 0x0100L;
+constexpr LONG CBS_HASSTRINGS = 0x0200L;
+constexpr LONG CBS_NOINTEGRALHEIGHT = 0x0400L;
+constexpr LONG CBS_DISABLENOSCROLL = 0x0800L;
 constexpr LONG LBS_MULTIPLESEL = 0x0008L;
 constexpr LONG LBS_EXTENDEDSEL = 0x0800L;
 constexpr LONG LBS_NOSEL = 0x4000L;
+constexpr LONG BS_TYPEMASK = 0x000FL;
 constexpr LONG BS_PUSHBUTTON = 0x0000L;
 constexpr LONG BS_DEFPUSHBUTTON = 0x0001L;
 constexpr LONG BS_CHECKBOX = 0x0002L;
@@ -603,6 +636,8 @@ constexpr int SM_CXDRAG = 68;
 constexpr int SM_CYDRAG = 69;
 constexpr int SM_CXFULLSCREEN = 16;
 constexpr int SM_CYFULLSCREEN = 17;
+
+constexpr int VK_DELETE = 0x2E;
 
 #ifndef VK_BACK
 constexpr int VK_BACK = 0x08;
@@ -1950,6 +1985,7 @@ int GetDlgCtrlID(HWND window);
 
 bool OpenTSMacOS_Is_Control_Window(HWND window);
 LRESULT OpenTSMacOS_Send_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
+LRESULT OpenTSMacOS_Dispatch_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 LRESULT OpenTSMacOS_Def_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 BOOL OpenTSMacOS_Get_Control_Rect(HWND window, RECT * rectangle, BOOL client);
 BOOL OpenTSMacOS_Control_Point_Transform(HWND window, POINT * point, BOOL to_screen);

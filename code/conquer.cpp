@@ -371,6 +371,7 @@ void Main_Game(int argc, char * argv[])
 	**		until they indicate that the user wants to exit the scenario.
 	*/
 	while (Select_Game(fade)) {
+		DebugString("Main_Game: Select_Game returned true, entering scenario\n");
 		fade = false;
 		ScenarioInit = 0;		// Kludge.
 		fade = true;
@@ -499,6 +500,7 @@ void Main_Game(int argc, char * argv[])
 	if (MouseCursor != NULL) {
 		MouseCursor->Release_Mouse();
 	}
+	DebugString("Main_Game: Select_Game loop finished\n");
 
 	/*
 	**	Free the scenario description buffers
