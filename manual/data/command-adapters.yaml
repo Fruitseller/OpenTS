@@ -282,6 +282,19 @@ fixed_controls:
       - { file: code/wdtsel.cpp, function: Selection::Check_For_Breakout, expression: VK_ESCAPE }
 
 fixed_exclusions:
+  - sites:
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_BACK }
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_HOME }
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_END }
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_LEFT }
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_RIGHT }
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_DELETE }
+      - { file: code/platform/macos/wincontrols.cpp, function: Base_Control_Message, expression: VK_SHIFT }
+      - { file: code/platform/macos/wincontrols.cpp, function: IsDialogMessage, expression: VK_ESCAPE }
+      - { file: code/platform/macos/wincontrols.cpp, function: IsDialogMessage, expression: VK_RETURN }
+      - { file: code/platform/macos/wincontrols.cpp, function: IsDialogMessage, expression: VK_TAB }
+      - { file: code/platform/macos/wincontrols.cpp, function: IsDialogMessage, expression: VK_SHIFT }
+    reason: Standard macOS compatibility-layer text editing and dialog navigation; the owning dialog defines the resulting action.
   - site: { file: code/debug.cpp, function: Debug_Key, expression: KN_BUTTON, guard: _DEBUG }
     reason: Filters mouse-button events before the debug key switch; it is not a control.
   - site: { file: code/debug.cpp, function: Debug_Key, expression: KN_BACKSPACE, guard: _DEBUG }

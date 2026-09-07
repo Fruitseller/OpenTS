@@ -1481,6 +1481,8 @@ restart:
 			}
 		}
 
+		DebugString("Init_Game: Start_Scenario returned true\n");
+
 		// The mission read clears these, so a launch file's carried-over flags are set after it.
 		if (Spawner_Is_Active() && Session.Type == GAME_NORMAL) {
 			for (int index = 0; index < ARRAY_SIZE(Environment.Globals); index++) {

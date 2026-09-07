@@ -681,6 +681,7 @@ int CALLBACK WinMain ( HINSTANCE instance , HINSTANCE , char * , int command_sho
  *=============================================================================================*/
 void __cdecl Prog_End(void)
 {
+	DebugString("Prog_End called!\n");
 	int i;
 
 	GameActive = false;

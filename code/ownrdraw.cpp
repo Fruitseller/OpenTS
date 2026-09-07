@@ -333,7 +333,7 @@ static LRESULT CALLBACK ComboDropWinCtrlProc_Internal(HWND hWnd, UINT Msg, WPARA
 	WinData * master_data = NULL;
 
 	ODWinData.getPointer(hWnd, &data);
-	if (data == NULL) {
+	if (data == NULL && Msg != WM_CREATE && Msg != WM_DESTROY && Msg != WM_NCDESTROY) {
 		DebugString("ComboBox dropdown windata = NULL\n");
 	}
 
@@ -341,7 +341,7 @@ static LRESULT CALLBACK ComboDropWinCtrlProc_Internal(HWND hWnd, UINT Msg, WPARA
 		ODWinData.getPointer(OwnerComboHandle, &master_data);
 	}
 
-	if (Msg != CB_GETCOUNT && Msg != CB_GETITEMHEIGHT && Msg != WM_VSCROLL) {
+	if (Msg != WM_CREATE && Msg != WM_DESTROY && Msg != WM_NCDESTROY && Msg != CB_GETCOUNT && Msg != CB_GETITEMHEIGHT && Msg != WM_VSCROLL) {
 		LRESULT item_count = SendMessage(OwnerComboHandle, CB_GETCOUNT, 0, 0);
 		LRESULT item_height = SendMessage(OwnerComboHandle, CB_GETITEMHEIGHT, 0, 0);
 		if (item_height <= 1) {
@@ -2893,6 +2893,12 @@ LRESULT CALLBACK StaticCtrlProc(HWND window, UINT message, WPARAM wparam, LPARAM
 			return(0);
 		}
 
+		case WM_NCHITTEST:
+			if (!(GetWindowLong(window, GWL_STYLE) & SS_NOTIFY)) {
+				return(HTTRANSPARENT);
+			}
+			break;
+
 		default:
 			break;
 	}
@@ -2985,20 +2991,32 @@ LRESULT CALLBACK CheckBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 		case BM_SETCHECK: {
 			data->CheckBox.checkState = wparam;
 			InvalidateRect(window, NULL, FALSE);
+			WNDPROC subproc = NULL;
+			OriginalWndProcs.getValue(window, subproc);
+			if (subproc != NULL) {
+				CallWindowProc(subproc, window, message, wparam, lparam);
+			}
 			return(0);
 		}
 
 		case WM_LBUTTONDOWN:
 		case WM_LBUTTONDBLCLK: {
-			int xpos = (unsigned short)LOWORD(lparam);
-			int ypos = (unsigned short)HIWORD(lparam);
-			if (xpos < 18 && ypos < 18) {
+			int xpos = (short)LOWORD(lparam);
+			int ypos = (short)HIWORD(lparam);
+			RECT cr;
+			GetClientRect(window, &cr);
+			if (xpos >= 0 && ypos >= 0 && xpos < cr.right && ypos < cr.bottom) {
 				int checked = data->CheckBox.checkState != 1;
 				data->CheckBox.checkState = checked;
 				InvalidateRect(window, NULL, FALSE);
 				Sound_Effect(Rule->GenericClick);
 				HWND parent = GetParent(window);
 				SendMessage(parent, WM_COMMAND, MAKEWPARAM(GetWindowLong(window, GWL_ID), checked), (LPARAM)window);
+				WNDPROC subproc = NULL;
+				OriginalWndProcs.getValue(window, subproc);
+				if (subproc != NULL) {
+					CallWindowProc(subproc, window, BM_SETCHECK, checked, 0);
+				}
 				return(0);
 			} else {
 				return(0);
@@ -3041,10 +3059,14 @@ LRESULT CALLBACK ComboBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 	ODWinData.getPointer(window, &data);
 
 	switch (message) {
+		case CB_GETDROPPEDSTATE:
+			return(data != NULL && data->ComboBox.dropdown != NULL);
+
 		case WM_LBUTTONDOWN:
 		case WM_LBUTTONDBLCLK: {
 			Sound_Effect(Rule->GenericClick);
-			if ((unsigned short)LOWORD(lparam) > client_rect.right - 20) {
+			LONG style = GetWindowLong(window, GWL_STYLE);
+			if ((style & 0x0003) == CBS_DROPDOWNLIST || (unsigned short)LOWORD(lparam) > client_rect.right - 20) {
 				LRESULT dropped = SendMessage(window, CB_GETDROPPEDSTATE, 0, 0);
 				PostMessage(window, CB_SHOWDROPDOWN, (WPARAM)(dropped != 1), 0);
 			}
@@ -3189,7 +3211,11 @@ LRESULT CALLBACK ComboBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 					SendMessage(parent, OD_SETTOP, (WPARAM)data->ComboBox.dropdown, 0);
 
 					HWND dropdown_window = data->ComboBox.dropdown;
-					DestroyWindow(dropdown_window);
+					data->ComboBox.dropdown = NULL;
+					if (_dropdown_window == dropdown_window) {
+						_dropdown_window = NULL;
+						_dropdown_owner = NULL;
+					}
 
 					WinData * dropdown_data = NULL;
 					ODWinData.getPointer(dropdown_window, &dropdown_data);
@@ -3200,7 +3226,12 @@ LRESULT CALLBACK ComboBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 					}
 
 					ODWinData.remove(dropdown_window);
-					data->ComboBox.dropdown = NULL;
+					DestroyWindow(dropdown_window);
+				}
+				WNDPROC proc = NULL;
+				OriginalWndProcs.getValue(window, proc);
+				if (proc != NULL) {
+					CallWindowProc(proc, window, message, wparam, lparam);
 				}
 				return(result);
 			}
@@ -3261,6 +3292,11 @@ LRESULT CALLBACK ComboBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 			ShowWindow(dropdown_window, 1);
 
 			data->ComboBox.dropdown = dropdown_window;
+			WNDPROC proc = NULL;
+			OriginalWndProcs.getValue(window, proc);
+			if (proc != NULL) {
+				CallWindowProc(proc, window, message, wparam, lparam);
+			}
 			return(result);
 		}
 
@@ -4814,6 +4850,25 @@ LRESULT CALLBACK TrackBarCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 
 		case WM_MOUSEMOVE:
 			if (dragging) {
+				int xpos = (short)LOWORD(lparam);
+				int x = xpos - 6;
+				if (x < 1) {
+					x = 1;
+				}
+
+				int max_x = client_rect.right - number_width - 12;
+				if (max_x < x) {
+					x = max_x;
+				}
+
+				int idx = ((range + 1) * (x - 1)) / slider_width;
+				if (idx >= range) {
+					idx = range;
+				}
+
+				value = step * ((minimum + idx) / step) - minimum;
+				thumb_pos = value * slider_width / range;
+
 				RECT rect = client_rect;
 				InvalidateRect(window, &rect, FALSE);
 			}
@@ -4862,6 +4917,9 @@ LRESULT CALLBACK TrackBarCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 
 					value = step * ((minimum + idx) / step) - minimum;
 					thumb_pos = value * slider_width / range;
+					if (message == WM_LBUTTONDOWN) {
+						dragging = 1;
+					}
 				}
 			}
 			break;
@@ -5001,6 +5059,9 @@ LRESULT CALLBACK GroupBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 
 		case WM_NCPAINT:
 			return(0);
+
+		case WM_NCHITTEST:
+			return(HTTRANSPARENT);
 	}
 
 	WNDPROC proc = NULL;
@@ -6903,6 +6964,9 @@ bool OwnerDraw::Dialog_Message_Handler(void)
 	} else {
 		Call_Back();
 	}
+
+	Video_Present_If_Dirty();
+	Sleep(1);
 
 	return(false);
 }

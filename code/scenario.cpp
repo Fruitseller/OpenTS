@@ -786,7 +786,9 @@ bool Read_Scenario(char const * fname)
 		MAX_MESSAGE_LENGTH - 14,			// max for trimming overflow
 		TacticalRect.Width);					// Width in pixels of buffer
 
+	DebugString("Start_Scenario: Calling Fill_In_Data\n");
 	Fill_In_Data();
+	DebugString("Start_Scenario: Fill_In_Data completed\n");
 
 	Session.Update_Progress(100 + (Scen->IsRandom ? 100 : 0));
 
@@ -796,6 +798,7 @@ bool Read_Scenario(char const * fname)
 	Sync_Recorder_Arm();
 
 	bool all_loaded = Wait_For_Players_To_Load();
+	DebugString("Start_Scenario: Wait_For_Players_To_Load returned %d\n", all_loaded ? 1 : 0);
 
 	if (Session.Type == GAME_INTERNET) {
 		Session.Init_Fixed_Alliances();
@@ -808,13 +811,17 @@ bool Read_Scenario(char const * fname)
 
 			Call_Back();
 			double progress = Progress.Get_Current_Progress();
+			DebugString("Start_Scenario: Initial progress = %f\n", progress);
 
-			while (progress < 1.0) {
-				for (int i = 0; i < Session.Players.Count(); i++) {
+			int loop_count = 0;
+			while (progress < 1.0 && loop_count < 100) {
+				loop_count++;
+				for (int i = 0; i < std::max(1, Session.Players.Count()); i++) {
 					Progress.Set_Progress_Percent(i, 100);
 				}
 				progress = Progress.Get_Current_Progress();
 			}
+			DebugString("Start_Scenario: Final progress = %f (loops: %d)\n", progress, loop_count);
 		}
 	}
 
@@ -824,6 +831,7 @@ bool Read_Scenario(char const * fname)
 
 	BEnd(BENCH_SCENARIO);
 
+	DebugString("Start_Scenario: Returning true\n");
 	return(true);
 }
 
@@ -895,9 +903,11 @@ void Fill_In_Data(void)
 
 		if (tp->Attaches_To() & ATTACH_HOUSE) {
 			TagClass * tt = Find_Or_Make(tp);
-			HouseClass * owner = tt->Class->FirstTrigger->House;
-			if (owner != NULL) {
-				owner->HouseTags.Add(tt);
+			if (tt && tt->Class && tt->Class->FirstTrigger && tt->Class->FirstTrigger->House) {
+				HouseClass * house = House_From_HousesType(tt->Class->FirstTrigger->House->House);
+				if (house) {
+					house->HouseTags.Add(tt);
+				}
 			}
 		}
 	}
@@ -925,8 +935,13 @@ void Fill_In_Data(void)
 	*/
 	for (index = 0; index < TagTypes.Count(); index++) {
 		TagTypeClass * tp = TagTypes[index];
-		if (tp->Is_Allow_Win() && tp->FirstTrigger->House != NULL) {
-			tp->FirstTrigger->House->Blockage++;
+		if (tp && tp->Is_Allow_Win()) {
+			if (tp->FirstTrigger && tp->FirstTrigger->House && tp->FirstTrigger->House->HeapID < Houses.Count()) {
+				HouseClass * house = Houses[tp->FirstTrigger->House->HeapID];
+				if (house) {
+					house->Blockage++;
+				}
+			}
 		}
 	}
 
@@ -937,7 +952,7 @@ void Fill_In_Data(void)
 		for (int house = 0; house < Houses.Count(); house++) {
 			HouseClass * hptr = Houses[house];
 
-			if (hptr != NULL) {
+			if (hptr != NULL && Tiberiums.Count() > 0) {
 				int money = hptr->Available_Money();
 				TiberiumClass const * tib = Tiberiums[0];
 
@@ -969,7 +984,10 @@ void Fill_In_Data(void)
 	Map.Set_WasUnderBridge_Flags();
 
 	if (GasSystem == NULL) {
-		GasSystem = new ParticleSystemClass(ParticleSystemTypes[ParticleSystemTypeClass::From_Name("GasCloudSys")], Cell(10, 10));
+		int gas_cloud_type = ParticleSystemTypeClass::From_Name("GasCloudSys");
+		if (gas_cloud_type >= 0 && gas_cloud_type < ParticleSystemTypes.Count()) {
+			GasSystem = new ParticleSystemClass(ParticleSystemTypes[gas_cloud_type], Cell(10, 10));
+		}
 	}
 }
 

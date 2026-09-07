@@ -1,5 +1,6 @@
 add_executable(MacOSWindow
 	macoswindow.mm
+	"${CMAKE_SOURCE_DIR}/code/platform/macos/peresource.cpp"
 	"${CMAKE_SOURCE_DIR}/code/platform/macos/macoswindow.mm"
 )
 target_compile_features(MacOSWindow PRIVATE cxx_std_20)
@@ -22,3 +23,5 @@ add_test(NAME macoswindow-focus COMMAND MacOSWindow focus)
 add_test(NAME macoswindow-fullscreen-level COMMAND MacOSWindow fullscreen-level)
 add_test(NAME macoswindow-quit COMMAND MacOSWindow quit)
 add_test(NAME macoswindow-command-q COMMAND MacOSWindow command-q)
+
+add_test(NAME macoswindow-text-input COMMAND MacOSWindow text-input)
