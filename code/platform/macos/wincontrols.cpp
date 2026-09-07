@@ -37,14 +37,19 @@ namespace
 		bool Enabled = true;
 		bool Visible = true;
 		bool DropdownVisible = false;
+		bool NeedsPaint = false;
+		bool PaintQueued = false;
 		int CurrentSelection = -1;
 		int TopIndex = 0;
 		int ItemHeight = 16;
+		int DroppedHeight = 0;
 		int CheckState = BST_UNCHECKED;
 		int RangeMinimum = 0;
 		int RangeMaximum = 100;
 		int Position = 0;
 		std::size_t TextLimit = 0x7fffffff;
+		std::size_t SelectionStart = 0;
+		std::size_t SelectionEnd = 0;
 		std::vector<ControlItem> Items;
 		std::vector<HWND> Children;
 		std::unordered_map<int, LONG_PTR> ExtraValues;
@@ -81,7 +86,14 @@ namespace
 	void Infer_Control_Class(ControlWindow & control, UINT message)
 	{
 		if (control.ClassName != "Static") return;
-		if (message >= CB_GETEDITSEL && message <= CB_GETTOPINDEX) control.ClassName = "ComboBox";
+		if (message >= CB_GETEDITSEL && message <= CB_GETTOPINDEX) {
+			control.ClassName = "ComboBox";
+			if (control.DroppedHeight == 0) {
+				constexpr int COMBO_CLOSED_HEIGHT = 24;
+				control.DroppedHeight = std::max(static_cast<int>(control.Rectangle.bottom - control.Rectangle.top), COMBO_CLOSED_HEIGHT);
+				control.Rectangle.bottom = control.Rectangle.top + COMBO_CLOSED_HEIGHT;
+			}
+		}
 		else if (message >= LB_ADDSTRING && message <= LB_FINDSTRINGEXACT) control.ClassName = "ListBox";
 		else if (message >= BM_GETCHECK && message <= BM_CLICK) control.ClassName = "Button";
 		else if (message >= EM_SETSEL && message <= EM_SETLIMITTEXT) control.ClassName = "Edit";
@@ -98,9 +110,69 @@ namespace
 		return(index);
 	}
 
+	void Replace_Edit_Selection(HWND window, ControlWindow & control, std::string const & text)
+	{
+		std::size_t const start = std::min(control.SelectionStart, control.SelectionEnd);
+		std::size_t const end = std::max(control.SelectionStart, control.SelectionEnd);
+		std::size_t const remaining = control.Text.size() - (end - start);
+		std::size_t const count = std::min(text.size(), control.TextLimit > remaining ? control.TextLimit - remaining : 0);
+		control.Text.replace(start, end - start, text, 0, count);
+		control.SelectionStart = control.SelectionEnd = start + count;
+		InvalidateRect(window, nullptr, FALSE);
+		SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, EN_CHANGE), reinterpret_cast<LPARAM>(window));
+	}
+
+
 	LRESULT Base_Control_Message(HWND window, ControlWindow & control, UINT message, WPARAM wparam, LPARAM lparam)
 	{
 		Infer_Control_Class(control, message);
+		if (strcasecmp(control.ClassName.c_str(), "Edit") == 0) {
+			switch (message) {
+				case EM_SETSEL:
+					if (static_cast<INT_PTR>(wparam) == -1) {
+						control.SelectionStart = control.SelectionEnd;
+					} else {
+						control.SelectionStart = std::min(static_cast<std::size_t>(wparam), control.Text.size());
+						control.SelectionEnd = std::min(static_cast<std::size_t>(lparam), control.Text.size());
+					}
+					return(0);
+				case EM_GETSEL:
+					if (wparam) *reinterpret_cast<DWORD *>(wparam) = static_cast<DWORD>(control.SelectionStart);
+					if (lparam) *reinterpret_cast<DWORD *>(lparam) = static_cast<DWORD>(control.SelectionEnd);
+					return(MAKELONG(control.SelectionStart, control.SelectionEnd));
+				case WM_LBUTTONDOWN:
+					SetFocus(window);
+					control.SelectionStart = control.SelectionEnd = control.Text.size();
+					return(0);
+				case WM_LBUTTONUP:
+					return(0);
+				case WM_CHAR:
+					if (!control.Enabled || (control.Style & ES_READONLY)) return(0);
+					if (wparam == VK_BACK) {
+						if (control.SelectionStart == control.SelectionEnd && control.SelectionStart > 0) --control.SelectionStart;
+						Replace_Edit_Selection(window, control, "");
+					} else if (wparam >= 32 && wparam <= 255 && wparam != 127) {
+						Replace_Edit_Selection(window, control, std::string(1, static_cast<char>(wparam)));
+					}
+					return(0);
+				case WM_KEYDOWN: {
+					std::size_t position = control.SelectionEnd;
+					if (wparam == VK_HOME) position = 0;
+					else if (wparam == VK_END) position = control.Text.size();
+					else if (wparam == VK_LEFT && position > 0) --position;
+					else if (wparam == VK_RIGHT && position < control.Text.size()) ++position;
+					else if (wparam == VK_DELETE && !(control.Style & ES_READONLY)) {
+						if (control.SelectionStart == control.SelectionEnd && control.SelectionEnd < control.Text.size()) ++control.SelectionEnd;
+						Replace_Edit_Selection(window, control, "");
+						return(0);
+					} else return(0);
+					control.SelectionEnd = position;
+					if (!(GetAsyncKeyState(VK_SHIFT) & 0x8000)) control.SelectionStart = position;
+					return(0);
+				}
+			}
+		}
+
 		if (message == WM_USER + 1) {
 			if (control.ClassName == "msctls_trackbar32") return(control.RangeMinimum);
 			if (lparam != 0) {
@@ -122,17 +194,30 @@ namespace
 			return(control.Position);
 		}
 		switch (message) {
+			case WM_PAINT: control.NeedsPaint = false; return(0);
 			case WM_SETTEXT:
+				control.SelectionStart = control.SelectionEnd = 0;
 				control.Text.assign(reinterpret_cast<char const *>(lparam) ? reinterpret_cast<char const *>(lparam) : "", 0, control.TextLimit);
 				return(TRUE);
-			case WM_GETTEXT:
+			case WM_GETTEXT: {
 				if (lparam == 0 || wparam == 0) return(0);
-				std::strncpy(reinterpret_cast<char *>(lparam), control.Text.c_str(), wparam - 1);
+				std::string const & text = (control.ClassName == "ComboBox" && control.CurrentSelection >= 0 && static_cast<std::size_t>(control.CurrentSelection) < control.Items.size())
+					? control.Items[control.CurrentSelection].Text : control.Text;
+				std::strncpy(reinterpret_cast<char *>(lparam), text.c_str(), wparam - 1);
 				reinterpret_cast<char *>(lparam)[wparam - 1] = '\0';
-				return(std::min<std::size_t>(control.Text.size(), wparam - 1));
-			case WM_GETTEXTLENGTH: return(control.Text.size());
+				return(std::min<std::size_t>(text.size(), wparam - 1));
+			}
+			case WM_GETTEXTLENGTH: {
+				if (control.ClassName == "ComboBox" && control.CurrentSelection >= 0 && static_cast<std::size_t>(control.CurrentSelection) < control.Items.size()) {
+					return(control.Items[control.CurrentSelection].Text.size());
+				}
+				return(control.Text.size());
+			}
 			case BM_GETCHECK: return(control.CheckState);
-			case BM_SETCHECK: control.CheckState = static_cast<int>(wparam); return(0);
+			case BM_SETCHECK:
+				control.CheckState = static_cast<int>(wparam);
+				InvalidateRect(window, nullptr, FALSE);
+				return(0);
 			case EM_SETLIMITTEXT: control.TextLimit = wparam; return(0);
 			case CB_ADDSTRING:
 			case LB_ADDSTRING: return(Insert_Item(control, -1, reinterpret_cast<char const *>(lparam)));
@@ -151,10 +236,18 @@ namespace
 			case CB_GETCURSEL:
 			case LB_GETCURSEL: return(control.CurrentSelection < 0 ? CB_ERR : control.CurrentSelection);
 			case CB_SETCURSEL:
-			case LB_SETCURSEL:
-				if (static_cast<INT_PTR>(wparam) < -1 || wparam >= control.Items.size()) return(CB_ERR);
-				control.CurrentSelection = static_cast<int>(wparam);
+			case LB_SETCURSEL: {
+				int const index = static_cast<int>(wparam);
+				if (index < -1 || (index >= 0 && static_cast<std::size_t>(index) >= control.Items.size())) return(CB_ERR);
+				control.CurrentSelection = index;
+				if (index >= 0 && static_cast<std::size_t>(index) < control.Items.size()) {
+					control.Text = control.Items[index].Text;
+				} else {
+					control.Text.clear();
+				}
+				InvalidateRect(window, nullptr, FALSE);
 				return(control.CurrentSelection);
+			}
 			case CB_GETLBTEXT:
 			case LB_GETTEXT:
 				if (wparam >= control.Items.size() || lparam == 0) return(CB_ERR);
@@ -190,9 +283,15 @@ namespace
 			case LB_SETTOPINDEX: control.TopIndex = std::max(0, static_cast<int>(wparam)); return(0);
 			case CB_SHOWDROPDOWN: control.DropdownVisible = wparam != 0; return(TRUE);
 			case CB_GETDROPPEDSTATE: return(control.DropdownVisible);
-			case CB_GETDROPPEDCONTROLRECT:
-				if (lparam) *reinterpret_cast<RECT *>(lparam) = control.Rectangle;
+			case CB_GETDROPPEDCONTROLRECT: {
+				if (!lparam) return(FALSE);
+				RECT * rect = reinterpret_cast<RECT *>(lparam);
+				if (!GetWindowRect(window, rect)) return(FALSE);
+				if (control.DroppedHeight > 0) {
+					rect->bottom = rect->top + control.DroppedHeight;
+				}
 				return(TRUE);
+			}
 			case LB_GETSEL:
 				return(wparam < control.Items.size() ? control.Items[wparam].Selected : LB_ERR);
 			case LB_SETSEL:
@@ -256,9 +355,9 @@ namespace
 				}
 				return(0);
 			case WM_LBUTTONDOWN: {
+				if (!control.Enabled || strcasecmp(control.ClassName.c_str(), "Button") != 0) return(0);
 				SetCapture(window);
-				control.CheckState = BST_PUSHED;
-				if (control.Parent) {
+				if (control.Parent && (control.Style & BS_TYPEMASK) == BS_OWNERDRAW) {
 					DRAWITEMSTRUCT dis{};
 					dis.CtlType = ODT_BUTTON;
 					dis.CtlID = static_cast<UINT>(control.Identifier);
@@ -272,11 +371,12 @@ namespace
 				return(0);
 			}
 			case WM_LBUTTONUP: {
-				if (GetCapture() == window) {
+				if (!control.Enabled || strcasecmp(control.ClassName.c_str(), "Button") != 0) return(0);
+				bool const was_captured = (GetCapture() == window);
+				if (was_captured) {
 					ReleaseCapture();
 				}
-				control.CheckState = BST_UNCHECKED;
-				if (control.Parent) {
+				if (control.Parent && (control.Style & BS_TYPEMASK) == BS_OWNERDRAW) {
 					DRAWITEMSTRUCT dis{};
 					dis.CtlType = ODT_BUTTON;
 					dis.CtlID = static_cast<UINT>(control.Identifier);
@@ -289,22 +389,20 @@ namespace
 				InvalidateRect(window, nullptr, FALSE);
 				POINT pt = {static_cast<SHORT>(LOWORD(lparam)), static_cast<SHORT>(HIWORD(lparam))};
 				RECT rc = {0, 0, control.Rectangle.right - control.Rectangle.left, control.Rectangle.bottom - control.Rectangle.top};
-				if (PtInRect(&rc, pt) && control.Parent) {
-					if (control.ClassName == "Button" && (control.Style & (BS_CHECKBOX | BS_AUTOCHECKBOX | BS_3STATE | BS_AUTO3STATE))) {
+				if (was_captured && PtInRect(&rc, pt) && control.Parent) {
+					if ((control.Style & BS_TYPEMASK) == BS_AUTOCHECKBOX) {
 						control.CheckState = (control.CheckState == BST_CHECKED) ? BST_UNCHECKED : BST_CHECKED;
 						InvalidateRect(window, nullptr, FALSE);
-						SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, control.CheckState), reinterpret_cast<LPARAM>(window));
-					} else {
-						SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, BN_CLICKED), reinterpret_cast<LPARAM>(window));
 					}
+					SendMessage(control.Parent, WM_COMMAND, MAKEWPARAM(control.Identifier, BN_CLICKED), reinterpret_cast<LPARAM>(window));
 				}
 				return(0);
 			}
 			case WM_NCHITTEST:
-				if (control.ClassName == "Button" && (control.Style & BS_GROUPBOX) == BS_GROUPBOX) {
+				if (strcasecmp(control.ClassName.c_str(), "button") == 0 && (control.Style & BS_TYPEMASK) == BS_GROUPBOX) {
 					return(HTTRANSPARENT);
 				}
-				if (control.ClassName == "Static" && !(control.Style & SS_NOTIFY)) {
+				if (strcasecmp(control.ClassName.c_str(), "static") == 0 && !(control.Style & SS_NOTIFY)) {
 					return(HTTRANSPARENT);
 				}
 				return(HTCLIENT);
@@ -502,6 +600,19 @@ LRESULT OpenTSMacOS_Send_Control_Message(HWND window, UINT message, WPARAM wpara
 	return(Base_Control_Message(window, *control, message, wparam, lparam));
 }
 
+LRESULT OpenTSMacOS_Dispatch_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
+{
+	std::lock_guard lock(ControlMutex);
+	ControlWindow * control = Find_Control(window);
+	if (!control) return(0);
+	if (message == WM_PAINT) {
+		control->PaintQueued = false;
+		if (!control->NeedsPaint) return(0);
+	}
+	return(OpenTSMacOS_Send_Control_Message(window, message, wparam, lparam));
+}
+
+
 LRESULT OpenTSMacOS_Def_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
 	std::lock_guard lock(ControlMutex);
@@ -535,7 +646,10 @@ LRESULT DefDlgProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 
 LRESULT CallWindowProc(WNDPROC procedure, HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
-	return(procedure ? procedure(window, message, wparam, lparam) : 0);
+	if (procedure != nullptr && procedure != DefWindowProc) {
+		return(procedure(window, message, wparam, lparam));
+	}
+	return(DefWindowProc(window, message, wparam, lparam));
 }
 
 LONG_PTR SetWindowLongPtr(HWND window, int index, LONG_PTR value)
@@ -592,13 +706,19 @@ BOOL UnregisterClass(LPCSTR class_name, HINSTANCE)
 }
 
 HWND CreateWindowEx(DWORD extended_style, LPCSTR class_name, LPCSTR title, DWORD style,
-	int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE, LPVOID parameter)
+	int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance, LPVOID parameter)
 {
 	std::lock_guard lock(ControlMutex);
 	auto control = std::make_unique<ControlWindow>();
 	control->ClassName = class_name ? class_name : "Static";
 	control->Text = title ? title : "";
-	control->Rectangle = {x, y, x + width, y + height};
+	constexpr int COMBO_CLOSED_HEIGHT = 24;
+	int window_height = height;
+	if (strcasecmp(control->ClassName.c_str(), "combobox") == 0) {
+		control->DroppedHeight = std::max(height, COMBO_CLOSED_HEIGHT);
+		window_height = COMBO_CLOSED_HEIGHT;
+	}
+	control->Rectangle = {x, y, x + width, y + window_height};
 	control->Style = style;
 	control->ExtendedStyle = extended_style;
 	control->Identifier = reinterpret_cast<INT_PTR>(menu);
@@ -609,7 +729,20 @@ HWND CreateWindowEx(DWORD extended_style, LPCSTR class_name, LPCSTR title, DWORD
 	if (found != Classes.end()) control->Procedure = found->second;
 	HWND const handle = Add_Control(std::move(control));
 	if (ControlWindow * added = Find_Control(handle); added && added->Procedure && added->Procedure != DefWindowProc) {
-		added->Procedure(handle, WM_CREATE, 0, reinterpret_cast<LPARAM>(parameter));
+		CREATESTRUCT cs{};
+		cs.lpCreateParams = parameter;
+		cs.hInstance = instance;
+		cs.hMenu = menu;
+		cs.hwndParent = parent;
+		cs.cy = height;
+		cs.cx = width;
+		cs.y = y;
+		cs.x = x;
+		cs.style = style;
+		cs.lpszName = title;
+		cs.lpszClass = class_name;
+		cs.dwExStyle = extended_style;
+		added->Procedure(handle, WM_CREATE, 0, reinterpret_cast<LPARAM>(&cs));
 	}
 	return(handle);
 }
@@ -723,6 +856,9 @@ BOOL DestroyWindow(HWND window)
 	for (HWND child : children) DestroyWindow(child);
 	if (control->DialogProcedure) control->DialogProcedure(window, WM_DESTROY, 0, 0);
 	else if (control->Procedure && control->Procedure != DefWindowProc) control->Procedure(window, WM_DESTROY, 0, 0);
+	if (control->DialogProcedure) control->DialogProcedure(window, WM_NCDESTROY, 0, 0);
+	else if (control->Procedure && control->Procedure != DefWindowProc) control->Procedure(window, WM_NCDESTROY, 0, 0);
+	HWND const parent_handle = control->Parent;
 	if (ControlWindow * parent = Find_Control(control->Parent)) {
 		parent->Children.erase(std::remove(parent->Children.begin(), parent->Children.end(), window), parent->Children.end());
 	} else {
@@ -731,6 +867,9 @@ BOOL DestroyWindow(HWND window)
 	if (FocusWindow == window) FocusWindow = nullptr;
 	if (CaptureWindow == window) CaptureWindow = nullptr;
 	Controls.erase(window);
+	if (parent_handle && Find_Control(parent_handle) != nullptr) {
+		RedrawWindow(parent_handle, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+	}
 	return(TRUE);
 }
 
@@ -858,7 +997,10 @@ HWND OpenTSMacOS_Set_Control_Focus(HWND window)
 {
 	std::lock_guard lock(ControlMutex);
 	HWND const previous = FocusWindow;
+	if (previous == window) return(previous);
 	FocusWindow = window;
+	if (Find_Control(previous)) SendMessage(previous, WM_KILLFOCUS, reinterpret_cast<WPARAM>(window), 0);
+	if (FocusWindow == window && Find_Control(window)) SendMessage(window, WM_SETFOCUS, reinterpret_cast<WPARAM>(previous), 0);
 	return(previous);
 }
 
@@ -1010,7 +1152,7 @@ BOOL GetWindowRect(HWND window, RECT * rectangle)
 
 BOOL MoveWindow(HWND window, int x, int y, int width, int height, BOOL repaint)
 {
-	return(SetWindowPos(window, nullptr, x, y, width, height, repaint ? 0 : SWP_NOREDRAW));
+	return(SetWindowPos(window, nullptr, x, y, width, height, (repaint ? 0 : SWP_NOREDRAW) | SWP_NOZORDER));
 }
 
 BOOL SetWindowPos(HWND window, HWND insert_after, int x, int y, int width, int height, UINT flags)
@@ -1026,6 +1168,10 @@ BOOL SetWindowPos(HWND window, HWND insert_after, int x, int y, int width, int h
 	if (flags & SWP_NOSIZE) {
 		width = control->Rectangle.right - control->Rectangle.left;
 		height = control->Rectangle.bottom - control->Rectangle.top;
+	} else if (strcasecmp(control->ClassName.c_str(), "combobox") == 0) {
+		constexpr int COMBO_CLOSED_HEIGHT = 24;
+		control->DroppedHeight = std::max(height, COMBO_CLOSED_HEIGHT);
+		height = COMBO_CLOSED_HEIGHT;
 	}
 	control->Rectangle = {x, y, x + width, y + height};
 
@@ -1127,15 +1273,33 @@ BOOL GetMonitorInfo(HMONITOR, MONITORINFO * information)
 
 BOOL OpenTSMacOS_Invalidate_Control(HWND window)
 {
-	if (!OpenTSMacOS_Is_Control_Window(window)) return(FALSE);
-	PostMessage(window, WM_PAINT, 0, 0);
+	std::lock_guard lock(ControlMutex);
+	ControlWindow * control = Find_Control(window);
+	if (!control) return(FALSE);
+	control->NeedsPaint = true;
+	if (!control->PaintQueued) {
+		control->PaintQueued = true;
+		PostMessage(window, WM_PAINT, 0, 0);
+	}
+	return(TRUE);
+}
+
+BOOL ValidateRect(HWND window, RECT const *)
+{
+	std::lock_guard lock(ControlMutex);
+	if (ControlWindow * control = Find_Control(window)) control->NeedsPaint = false;
 	return(TRUE);
 }
 
 BOOL GetUpdateRect(HWND window, RECT * rectangle, BOOL)
 {
-	if (!rectangle) return(window != nullptr);
-	return(GetClientRect(window, rectangle));
+	std::lock_guard lock(ControlMutex);
+	ControlWindow * control = Find_Control(window);
+	if (!control || !control->NeedsPaint) {
+		if (rectangle) *rectangle = {};
+		return(FALSE);
+	}
+	return(rectangle ? GetClientRect(window, rectangle) : TRUE);
 }
 
 int GetBkMode(HDC) { return(TRANSPARENT); }
@@ -1172,8 +1336,9 @@ BOOL RedrawWindow(HWND window, RECT const * rectangle, HANDLE, UINT flags)
 {
 	if (!window) return(FALSE);
 	if (OpenTSMacOS_Is_Control_Window(window)) {
+		if (flags & RDW_INVALIDATE) OpenTSMacOS_Invalidate_Control(window);
 		if (flags & RDW_UPDATENOW) {
-			SendMessage(window, WM_PAINT, 0, 0);
+			if (GetUpdateRect(window, nullptr, FALSE)) SendMessage(window, WM_PAINT, 0, 0);
 			if (flags & RDW_ALLCHILDREN) {
 				std::vector<HWND> children;
 				{
@@ -1188,8 +1353,6 @@ BOOL RedrawWindow(HWND window, RECT const * rectangle, HANDLE, UINT flags)
 					}
 				}
 			}
-		} else {
-			PostMessage(window, WM_PAINT, 0, 0);
 		}
 		return(TRUE);
 	}
@@ -1272,11 +1435,18 @@ BOOL IsDialogMessage(HWND dialog, MSG * message)
 			case VK_RETURN: {
 				HWND focus = GetFocus();
 				int id = IDOK;
-				if (focus && IsChild(dialog, focus)) {
+				char class_name[32] = {};
+				GetClassName(focus, class_name, sizeof(class_name));
+				LONG const type = GetWindowLong(focus, GWL_STYLE) & BS_TYPEMASK;
+				if (focus && IsChild(dialog, focus) && strcasecmp(class_name, "Button") == 0
+					&& (type == BS_PUSHBUTTON || type == BS_DEFPUSHBUTTON || type == BS_OWNERDRAW)) {
 					int const ctrl_id = GetDlgCtrlID(focus);
 					if (ctrl_id > 0) id = ctrl_id;
 				}
-				SendMessage(dialog, WM_COMMAND, MAKEWPARAM(id, BN_CLICKED), reinterpret_cast<LPARAM>(focus));
+				HWND const button = GetDlgItem(dialog, id);
+				if (!button || IsWindowEnabled(button)) {
+					SendMessage(dialog, WM_COMMAND, MAKEWPARAM(id, BN_CLICKED), reinterpret_cast<LPARAM>(button));
+				}
 				return(TRUE);
 			}
 			case VK_TAB: {
