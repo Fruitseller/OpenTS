@@ -42,12 +42,18 @@ bool Check_Command_Forms(void)
 	};
 	unsigned char repeated[66];
 	std::memset(repeated, 0x5A, sizeof(repeated));
-	unsigned char const repeated_expected[] = {0x81, 0x5A, 0xFE, 0x41, 0x00, 0x5A, 0x80};
+	unsigned char const repeated_expected[] = {0x81, 0x5A, 0xFF, 0x41, 0x00, 0x00, 0x00, 0x80};
+	unsigned char repeat_fill[67];
+	repeat_fill[0] = 'X';
+	std::memset(&repeat_fill[1], 0x5A, 65);
+	repeat_fill[66] = 'Y';
+	unsigned char const repeat_fill_expected[] = {0x81, 'X', 0xFE, 0x41, 0x00, 0x5A, 0x81, 'Y', 0x80};
 
 	return(Check_Golden(literals, sizeof(literals), literals_expected, sizeof(literals_expected))
 		&& Check_Golden(short_copy, sizeof(short_copy), short_copy_expected, sizeof(short_copy_expected))
 		&& Check_Golden(medium_copy, sizeof(medium_copy), medium_copy_expected, sizeof(medium_copy_expected))
-		&& Check_Golden(repeated, sizeof(repeated), repeated_expected, sizeof(repeated_expected)));
+		&& Check_Golden(repeated, sizeof(repeated), repeated_expected, sizeof(repeated_expected))
+		&& Check_Golden(repeat_fill, sizeof(repeat_fill), repeat_fill_expected, sizeof(repeat_fill_expected)));
 }
 
 

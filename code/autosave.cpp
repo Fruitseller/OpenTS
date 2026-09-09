@@ -12,6 +12,11 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#if !defined(_WIN32)
+#include <strings.h>
+#define _stricmp strcasecmp
+#define _strnicmp strncasecmp
+#endif
 
 
 void AutosaveClass::Set_Interval(int frames)

@@ -64,6 +64,7 @@
 #if !defined(_WIN32)
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <strings.h>
 #ifndef stricmp
@@ -99,6 +100,43 @@ inline char * OpenTS_strrev(char * text)
 #ifndef strrev
 #define strrev OpenTS_strrev
 #endif
+#ifndef MAX_PATH
+#define MAX_PATH 1024
+#endif
+#ifndef _MAX_PATH
+#define _MAX_PATH MAX_PATH
+#endif
+#ifndef _MAX_DRIVE
+#define _MAX_DRIVE 4
+#endif
+#ifndef _MAX_DIR
+#define _MAX_DIR MAX_PATH
+#endif
+#ifndef _MAX_FNAME
+#define _MAX_FNAME 256
+#endif
+#ifndef _MAX_EXT
+#define _MAX_EXT 256
+#endif
+inline void _makepath(char * path, char const *, char const * directory, char const * filename, char const * extension)
+{
+	char const * dot = extension && *extension && *extension != '.' ? "." : "";
+	std::snprintf(path, _MAX_PATH, "%s%s%s%s", directory ? directory : "", filename ? filename : "",
+		dot, extension && *extension ? extension : "");
+}
+inline void _splitpath(char const * path, char * drive, char * directory, char * filename, char * extension)
+{
+	if (drive) drive[0] = '\0';
+	// Windows _splitpath accepts both separators, and the game builds paths with backslashes.
+	char const * slash = std::strrchr(path, '/');
+	char const * backslash = std::strrchr(path, '\\');
+	if (backslash && (!slash || backslash > slash)) slash = backslash;
+	char const * base = slash ? slash + 1 : path;
+	char const * dot = std::strrchr(base, '.');
+	if (directory) { std::size_t length = slash ? static_cast<std::size_t>(slash - path + 1) : 0; std::memcpy(directory, path, length); directory[length] = '\0'; }
+	if (filename) { std::size_t length = dot ? static_cast<std::size_t>(dot - base) : std::strlen(base); std::memcpy(filename, base, length); filename[length] = '\0'; }
+	if (extension) std::strcpy(extension, dot ? dot : "");
+}
 #endif
 
 

@@ -132,8 +132,8 @@ long VQA_OpenAudio(VQAHandleP *vqap)
 	params.Channels = vqap->Channels;
 	params.BitsPerSample = vqap->BitsPerSample;
 	// AhandleInitParams carries these as void pointers and the handler casts them back.
-	params.Callback1 = (void *)VQA_AudioFillCallback;
-	params.Callback2 = (void *)VQA_AudioDoneCallback;
+	params.Callback1 = reinterpret_cast<void *>(VQA_AudioFillCallback);
+	params.Callback2 = reinterpret_cast<void *>(VQA_AudioDoneCallback);
 
 	rc = (long)vqap->Config.AudioHandler((VQAHandle *)vqap, VQAAUDIO_OPEN, &params, sizeof(params));
 	if (rc >= VQAERR_OK || rc == VQAERR_NONE) {
