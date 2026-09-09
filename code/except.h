@@ -51,6 +51,7 @@
 
 #else
 
+#define WM_EXCEPTION_TEST (WM_APP + 0x54)
 #define _Printf_format_string_
 
 #endif

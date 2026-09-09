@@ -9,9 +9,11 @@
 
 #include "always.h"
 
+#include "win.h"
 #include "dbgprint.h"
 #include "except.h"
 
+#include <dlfcn.h>
 #include <execinfo.h>
 #include <fcntl.h>
 #include <libproc.h>
@@ -151,4 +153,18 @@ void Exception_Run_Post_Window_Test()
 void Exception_Wndproc_Test_Fault()
 {
 	Fault();
+}
+
+bool Describe_Code_Address(void const * address, char * buffer, unsigned size)
+{
+	if (!buffer || size == 0) return false;
+	buffer[0] = '\0';
+	Dl_info info;
+	if (dladdr(address, &info) && info.dli_sname) {
+		uintptr_t const displacement = (uintptr_t)address - (uintptr_t)info.dli_saddr;
+		snprintf(buffer, size, "%s()+0x%lx", info.dli_sname, displacement);
+		buffer[size - 1] = '\0';
+		return true;
+	}
+	return false;
 }

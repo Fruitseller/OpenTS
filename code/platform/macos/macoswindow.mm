@@ -1011,6 +1011,20 @@ int ToAscii(UINT key, UINT, BYTE const * state, WORD * result, UINT)
 	return(0);
 }
 
+int ToUnicode(UINT key, UINT scancode, BYTE const * state, LPWSTR buffer, int size, UINT flags)
+{
+	if (buffer == nullptr || size < 1) {
+		return(0);
+	}
+	WORD ascii = 0;
+	int count = ToAscii(key, scancode, state, &ascii, flags);
+	if (count > 0 && ascii != 0) {
+		buffer[0] = static_cast<wchar_t>(ascii);
+		return(1);
+	}
+	return(0);
+}
+
 BOOL GetClientRect(HWND window, RECT * rectangle)
 {
 	return(OpenTSMacOS_Is_Control_Window(window)
@@ -1049,6 +1063,50 @@ int GetSystemMetrics(int index)
 		case SM_SWAPBUTTON: return(0);
 		default: return(0);
 	}
+}
+
+BOOL EnumDisplaySettings(LPCSTR, DWORD iModeNum, DEVMODEA * lpDevMode)
+{
+	if (!lpDevMode) return(FALSE);
+
+	CGDirectDisplayID const display = CGMainDisplayID();
+	CFArrayRef const modes = CGDisplayCopyAllDisplayModes(display, nullptr);
+	if (!modes) return(FALSE);
+
+	CFIndex const count = CFArrayGetCount(modes);
+	if (static_cast<CFIndex>(iModeNum) >= count) {
+		CFRelease(modes);
+		return(FALSE);
+	}
+
+	CGDisplayModeRef const mode = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, static_cast<CFIndex>(iModeNum));
+	size_t const width = CGDisplayModeGetWidth(mode);
+	size_t const height = CGDisplayModeGetHeight(mode);
+	double const refresh = CGDisplayModeGetRefreshRate(mode);
+
+	lpDevMode->dmPelsWidth = static_cast<DWORD>(width);
+	lpDevMode->dmPelsHeight = static_cast<DWORD>(height);
+	lpDevMode->dmBitsPerPel = 32;
+	lpDevMode->dmDisplayFrequency = static_cast<DWORD>(refresh > 0.0 ? refresh : 60.0);
+
+	CFRelease(modes);
+	return(TRUE);
+}
+
+int GetDeviceCaps(HDC, int index)
+{
+	if (index == LOGPIXELSX || index == LOGPIXELSY) return(96);
+	if (index == VREFRESH) {
+		CGDirectDisplayID const display = CGMainDisplayID();
+		CGDisplayModeRef const mode = CGDisplayCopyDisplayMode(display);
+		if (mode) {
+			double const rate = CGDisplayModeGetRefreshRate(mode);
+			CGDisplayModeRelease(mode);
+			if (rate > 0.0) return(static_cast<int>(rate));
+		}
+		return(60);
+	}
+	return(0);
 }
 
 BOOL InvalidateRect(HWND window, RECT const *, BOOL)

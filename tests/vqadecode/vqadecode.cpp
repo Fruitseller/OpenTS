@@ -7,15 +7,16 @@
  * See LICENSE.md for applicable additional terms and warranty disclaimers.
  ******************************************************************************/
 
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 
 
 extern "C" unsigned short * HicolorTable;
 
-extern "C" void __cdecl ASM_UnVQ1_C1_TABLE_ALT(unsigned char * codebook,
-	unsigned char * pointers, unsigned char * buffer, unsigned long blocksperrow,
-	unsigned long numrows, unsigned long bufwidth);
+extern "C" void __cdecl UnVQ1_C1_TABLE_ALT(unsigned char * codebook,
+	unsigned char * pointers, unsigned char * buffer, size_t blocksperrow,
+	size_t numrows, size_t bufwidth);
 
 unsigned short * HicolorTable = nullptr;
 
@@ -50,7 +51,7 @@ bool Check_Solid(void)
 	for (unsigned short & pixel : buffer) {
 		pixel = GUARD;
 	}
-	ASM_UnVQ1_C1_TABLE_ALT(codebook, pointers, reinterpret_cast<unsigned char *>(buffer), 1, 1, 4);
+	UnVQ1_C1_TABLE_ALT(codebook, pointers, reinterpret_cast<unsigned char *>(buffer), 1, 1, 4);
 
 	return(Check_Row(buffer, 0, expected) && Check_Guard_Row(buffer, 1)
 		&& Check_Row(buffer, 2, expected) && Check_Guard_Row(buffer, 3));
@@ -67,7 +68,7 @@ bool Check_Codebook(void)
 		codebook[index] = static_cast<unsigned short>(index + 1);
 		buffer[index] = GUARD;
 	}
-	ASM_UnVQ1_C1_TABLE_ALT(reinterpret_cast<unsigned char *>(codebook), pointers,
+	UnVQ1_C1_TABLE_ALT(reinterpret_cast<unsigned char *>(codebook), pointers,
 		reinterpret_cast<unsigned char *>(buffer), 1, 1, 4);
 
 	return(Check_Row(buffer, 0, codebook) && Check_Guard_Row(buffer, 1)
