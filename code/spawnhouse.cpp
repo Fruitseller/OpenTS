@@ -11,6 +11,10 @@
 #include "spawnhouse.h"
 
 #include <cstring>
+#if !defined(_WIN32)
+#include <strings.h>
+#define _stricmp strcasecmp
+#endif
 
 static_assert(HOUSE_SPAWN_LAST - HOUSE_SPAWN_FIRST + 1 == SPAWN_HOUSE_COUNT, "one Spawn alias per start position");
 static_assert(HOUSE_PLAYER_AT_LAST - HOUSE_PLAYER_AT_FIRST + 1 == SPAWN_HOUSE_COUNT, "one Player @ alias per start position");

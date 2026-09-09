@@ -72,6 +72,7 @@ namespace {
 /// <returns>The preferred base, or zero when the header could not be read.</returns>
 static uint32_t Sync_Preferred_Image_Base(void)
 {
+#if defined(_WIN32)
 	char path[MAX_PATH];
 	if (GetModuleFileName(GetModuleHandle(nullptr), path, sizeof(path)) == 0) {
 		return(0);
@@ -103,6 +104,9 @@ static uint32_t Sync_Preferred_Image_Base(void)
 	CloseHandle(file);
 
 	return(base);
+#else
+	return(0);
+#endif
 }
 
 
@@ -246,6 +250,7 @@ void Sync_Recorder_Arm(void)
 	bool const network = (Session.Type == GAME_IPX || Session.Type == GAME_INTERNET);
 	SyncRecorder.Set_Recording(network || Session.Record || Session.Play);
 
+#if defined(_WIN32)
 	ModuleBase = (uintptr_t)GetModuleHandle(nullptr);
 	ModuleSize = 0;
 	MapImageBase = 0;
@@ -260,6 +265,11 @@ void Sync_Recorder_Arm(void)
 	}
 
 	MapImageBase = Sync_Preferred_Image_Base();
+#else
+	ModuleBase = 0;
+	ModuleSize = 0;
+	MapImageBase = 0;
+#endif
 
 	SyncCallerContextType context;
 	context.MapImageBase = MapImageBase;

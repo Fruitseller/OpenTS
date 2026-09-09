@@ -21,6 +21,10 @@
 #include <cstring>
 #include <filesystem>
 #include <vector>
+#if !defined(_WIN32)
+#include <strings.h>
+#define _stricmp strcasecmp
+#endif
 
 
 namespace {

@@ -59,6 +59,7 @@ bool AtLineStart = true;
 bool ConsoleActive = false;
 FILE * DebugFile = nullptr;
 char DebugFileName[MAX_PATH] = {};
+char DebugDirectory[MAX_PATH] = {};
 std::uintmax_t DebugBytesWritten = 0;
 
 bool Command_Line_Requests_Console()
@@ -202,6 +203,7 @@ void Init_Locked()
 		std::error_code error;
 		std::filesystem::path directory = std::filesystem::weakly_canonical(executable, error).parent_path() / "Debug";
 		std::filesystem::create_directories(directory, error);
+		strncpy(DebugDirectory, directory.c_str(), sizeof(DebugDirectory) - 1);
 		Delete_Files_Older_Than(directory.c_str(), "DEBUG_*.LOG", DebugLogMaxAgeDays);
 
 		auto const stamp = std::time(nullptr);
@@ -284,6 +286,12 @@ char const * Debug_Log_File_Name()
 {
 	Debug_Init();
 	return DebugFileName;
+}
+
+char const * Debug_Directory()
+{
+	Debug_Init();
+	return DebugDirectory;
 }
 
 void __cdecl DebugString(char const * format, ...)

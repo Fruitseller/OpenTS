@@ -36,8 +36,25 @@
 
 #include "win.h"
 
+#if !defined(OPENTS_MACOS)
 #include <intrin.h>
+#endif
 #include <math.h>
+
+namespace {
+
+inline unsigned long long Read_TSC(void)
+{
+#if defined(OPENTS_MACOS)
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	return static_cast<unsigned long long>(counter.QuadPart);
+#else
+	return __rdtsc();
+#endif
+}
+
+}
 
 typedef union {
 	LARGE_INTEGER LargeInt;
@@ -92,13 +109,7 @@ unsigned int Get_CPU_Rate(unsigned int & high)
 /// <returns>unsigned int; the low half of the clock value.</returns>
 unsigned int Get_CPU_Clock(unsigned int & high)
 {
-#if defined(OPENTS_MACOS)
-	LARGE_INTEGER counter;
-	QueryPerformanceCounter(&counter);
-	unsigned long long const stamp = static_cast<unsigned long long>(counter.QuadPart);
-#else
-	unsigned long long const stamp = __rdtsc();
-#endif
+	unsigned long long const stamp = Read_TSC();
 
 	high = (unsigned int)(stamp >> 32);
 	return((unsigned int)stamp);
@@ -139,7 +150,7 @@ static unsigned long TSC_High;
 /// <remarks>Only call this routine on a processor that supports the RDTSC opcode.</remarks>
 void RDTSC(void)
 {
-	unsigned long long const stamp = __rdtsc();
+	unsigned long long const stamp = Read_TSC();
 
 	TSC_Low = (unsigned long)(stamp & 0xFFFFFFFF);
 	TSC_High = (unsigned long)(stamp >> 32);
@@ -219,7 +230,7 @@ int Get_RDTSC_CPU_Speed(void)
 			QueryPerformanceCounter(&t1);
 		}
 
-		stamp0 = (unsigned long)(__rdtsc() & 0xFFFFFFFF);
+		stamp0 = (unsigned long)(Read_TSC() & 0xFFFFFFFF);
 
 		t0.LowPart = t1.LowPart;		// Reset Initial Time
 		t0.HighPart = t1.HighPart;
@@ -232,7 +243,7 @@ int Get_RDTSC_CPU_Speed(void)
 			QueryPerformanceCounter(&t1);
 		}
 
-		stamp1 = (unsigned long)(__rdtsc() & 0xFFFFFFFF);
+		stamp1 = (unsigned long)(Read_TSC() & 0xFFFFFFFF);
 
 
 		cycles = stamp1 - stamp0;					// # of cycles passed between reads

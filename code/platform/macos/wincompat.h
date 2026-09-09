@@ -183,12 +183,24 @@ constexpr WORD SUBLANG_DEFAULT = 1;
 #define INVALID_HANDLE_VALUE reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1))
 #define INVALID_SOCKET (-1)
 #define SOCKET_ERROR (-1)
+#ifndef MAX_PATH
 #define MAX_PATH 1024
+#endif
+#ifndef _MAX_PATH
 #define _MAX_PATH MAX_PATH
+#endif
+#ifndef _MAX_FNAME
 #define _MAX_FNAME 256
+#endif
+#ifndef _MAX_EXT
 #define _MAX_EXT 256
+#endif
+#ifndef _MAX_DRIVE
 #define _MAX_DRIVE 4
+#endif
+#ifndef _MAX_DIR
 #define _MAX_DIR MAX_PATH
+#endif
 
 struct POINT { LONG x; LONG y; };
 struct POINTS { SHORT x; SHORT y; };
@@ -262,6 +274,46 @@ struct DRAWITEMSTRUCT {
 	ULONG_PTR itemData;
 };
 using LPDRAWITEMSTRUCT = DRAWITEMSTRUCT *;
+
+struct DEVMODEA {
+	char dmDeviceName[32];
+	WORD dmSpecVersion;
+	WORD dmDriverVersion;
+	WORD dmSize;
+	WORD dmDriverExtra;
+	DWORD dmFields;
+	short dmOrientation;
+	short dmPaperSize;
+	short dmPaperLength;
+	short dmPaperWidth;
+	short dmScale;
+	short dmCopies;
+	short dmDefaultSource;
+	short dmPrintQuality;
+	short dmColor;
+	short dmDuplex;
+	short dmYResolution;
+	short dmTTOption;
+	short dmCollate;
+	char dmFormName[32];
+	WORD dmLogPixels;
+	DWORD dmBitsPerPel;
+	DWORD dmPelsWidth;
+	DWORD dmPelsHeight;
+	DWORD dmDisplayFlags;
+	DWORD dmDisplayFrequency;
+	DWORD dmICMMethod;
+	DWORD dmICMIntent;
+	DWORD dmMediaType;
+	DWORD dmDitherType;
+	DWORD dmReserved1;
+	DWORD dmReserved2;
+	DWORD dmPanningWidth;
+	DWORD dmPanningHeight;
+};
+using DEVMODE = DEVMODEA;
+using LPDEVMODEA = DEVMODEA *;
+using LPDEVMODE = DEVMODE *;
 constexpr UINT ODT_BUTTON = 4;
 constexpr UINT ODT_STATIC = 5;
 
@@ -450,6 +502,8 @@ constexpr WPARAM SC_SCREENSAVE = 0xF140;
 constexpr UINT BN_CLICKED = 0;
 constexpr UINT CBN_SELCHANGE = 1;
 constexpr UINT LBN_SELCHANGE = 1;
+constexpr UINT EN_SETFOCUS = 0x0100;
+constexpr UINT EN_KILLFOCUS = 0x0200;
 constexpr UINT EN_CHANGE = 0x0300;
 constexpr UINT EN_MAXTEXT = 0x0501;
 constexpr UINT LBN_DBLCLK = 2;
@@ -1029,6 +1083,23 @@ inline void GetSystemTime(SYSTEMTIME * time)
 	time->wMilliseconds = static_cast<WORD>(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
 }
 
+inline void GetLocalTime(SYSTEMTIME * time)
+{
+	if (!time) return;
+	auto const now = std::chrono::system_clock::now();
+	auto const seconds = std::chrono::system_clock::to_time_t(now);
+	std::tm local = {};
+	localtime_r(&seconds, &local);
+	time->wYear = static_cast<WORD>(local.tm_year + 1900);
+	time->wMonth = static_cast<WORD>(local.tm_mon + 1);
+	time->wDayOfWeek = static_cast<WORD>(local.tm_wday);
+	time->wDay = static_cast<WORD>(local.tm_mday);
+	time->wHour = static_cast<WORD>(local.tm_hour);
+	time->wMinute = static_cast<WORD>(local.tm_min);
+	time->wSecond = static_cast<WORD>(local.tm_sec);
+	time->wMilliseconds = static_cast<WORD>(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
+}
+
 inline BOOL SystemTimeToFileTime(SYSTEMTIME const * time, FILETIME * result)
 {
 	if (!time || !result) return(FALSE);
@@ -1178,6 +1249,52 @@ inline BOOL SetCurrentDirectory(char const * path)
 	return(FALSE);
 }
 
+inline DWORD GetCurrentDirectory(DWORD buffer_length, char * buffer)
+{
+	if (!buffer || buffer_length == 0) return(0);
+	if (getcwd(buffer, buffer_length) != nullptr) {
+		return(static_cast<DWORD>(std::strlen(buffer)));
+	}
+	SetLastError(errno);
+	return(0);
+}
+
+inline DWORD GetTempPath(DWORD buffer_length, char * buffer)
+{
+	char const * tmp = getenv("TMPDIR");
+	if (!tmp || !*tmp) tmp = "/tmp/";
+	std::string result = tmp;
+	if (result.back() != '/' && result.back() != '\\') {
+		result += '/';
+	}
+	if (result.length() + 1 > buffer_length) {
+		return(static_cast<DWORD>(result.length() + 1));
+	}
+	if (buffer) {
+		std::memcpy(buffer, result.c_str(), result.length() + 1);
+	}
+	return(static_cast<DWORD>(result.length()));
+}
+
+inline BOOL MoveFile(char const * existing_name, char const * new_name)
+{
+	std::string const native_source = OpenTSMacOS::NativePath(existing_name);
+	std::string const native_destination = OpenTSMacOS::NativePath(new_name);
+	if (rename(native_source.c_str(), native_destination.c_str()) == 0) return TRUE;
+	SetLastError(errno);
+	return FALSE;
+}
+
+#define DeleteFileA DeleteFile
+#define CopyFileA CopyFile
+#define MoveFileA MoveFile
+#define CreateFileA CreateFile
+#define GetFileAttributesA GetFileAttributes
+#define CreateDirectoryA CreateDirectory
+#define SetCurrentDirectoryA SetCurrentDirectory
+#define GetCurrentDirectoryA GetCurrentDirectory
+#define GetTempPathA GetTempPath
+
 inline HANDLE CreateMutex(void *, BOOL initially_owned, char const * name)
 {
 	auto * handle = new OpenTSMacOS::MutexHandle;
@@ -1281,6 +1398,7 @@ inline bool operator!=(GUID const & left, GUID const & right)
 }
 
 inline constexpr GUID IID_IUnknown = {0x00000000, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
+inline constexpr GUID IID_ISequentialStream = {0x0C733A30, 0x2A1C, 0x11CE, {0xAD, 0xE5, 0x00, 0xAA, 0x00, 0x44, 0x77, 0x3D}};
 inline constexpr GUID IID_IStream = {0x0000000C, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
 inline constexpr GUID IID_IStorage = {0x0000000B, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
 inline constexpr GUID IID_IPersist = {0x0000010C, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
@@ -1560,6 +1678,10 @@ inline DWORD GetCurrentThreadId(void)
 {
 	return(static_cast<DWORD>(std::hash<std::thread::id>{}(std::this_thread::get_id())));
 }
+inline DWORD GetCurrentProcessId(void)
+{
+	return(static_cast<DWORD>(getpid()));
+}
 inline void Sleep(DWORD milliseconds) { std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds)); }
 inline BOOL QueryPerformanceCounter(LARGE_INTEGER * value)
 {
@@ -1765,32 +1887,189 @@ inline char * _strlwr(char * text) { for (char * p = text; *p; p++) *p = static_
 inline char * strrev(char * text) { std::reverse(text, text + std::strlen(text)); return(text); }
 #endif
 
-inline int MultiByteToWideChar(UINT, DWORD, char const * source, int source_length,
+#ifndef CP_ACP
+#define CP_ACP 0
+#endif
+#ifndef CP_OEMCP
+#define CP_OEMCP 1
+#endif
+#ifndef CP_UTF8
+#define CP_UTF8 65001
+#endif
+
+#include "wctables.h"
+
+inline UINT GetACP(void) { return(1252); }
+inline BOOL SetConsoleCP(UINT) { return(TRUE); }
+inline BOOL SetConsoleOutputCP(UINT) { return(TRUE); }
+
+inline int MultiByteToWideChar(UINT code_page, DWORD, char const * source, int source_length,
 	wchar_t * destination, int destination_length)
 {
 	if (!source) return(0);
-	int const required = source_length < 0 ? static_cast<int>(strlen(source)) + 1 : source_length;
-	if (!destination || destination_length == 0) return(required);
-	int const copied = std::min(required, destination_length);
-	for (int index = 0; index < copied; ++index) {
-		destination[index] = static_cast<unsigned char>(source[index]);
+
+	int const input_length = source_length < 0 ? static_cast<int>(strlen(source)) + 1 : source_length;
+	if (input_length == 0) return(0);
+
+	if (code_page == CP_UTF8) {
+		int required = 0;
+		int index = 0;
+		while (index < input_length) {
+			unsigned char const lead = static_cast<unsigned char>(source[index]);
+			if (source_length < 0 && index == input_length - 1 && lead == '\0') {
+				required += 1;
+				break;
+			}
+			int sequence_len = 1;
+			if ((lead & 0x80) == 0) {
+				sequence_len = 1;
+			} else if ((lead & 0xE0) == 0xC0) {
+				sequence_len = 2;
+			} else if ((lead & 0xF0) == 0xE0) {
+				sequence_len = 3;
+			} else if ((lead & 0xF8) == 0xF0) {
+				sequence_len = 4;
+			}
+			index += sequence_len;
+			required += 1;
+		}
+
+		if (!destination || destination_length == 0) return(required);
+		if (destination_length < required) return(0);
+
+		int written = 0;
+		index = 0;
+		while (index < input_length && written < destination_length) {
+			unsigned char const lead = static_cast<unsigned char>(source[index]);
+			if (source_length < 0 && index == input_length - 1 && lead == '\0') {
+				destination[written++] = L'\0';
+				break;
+			}
+			if ((lead & 0x80) == 0) {
+				destination[written++] = static_cast<wchar_t>(lead);
+				index += 1;
+			} else if ((lead & 0xE0) == 0xC0 && index + 1 < input_length) {
+				uint32_t const cp = ((lead & 0x1F) << 6) | (static_cast<unsigned char>(source[index + 1]) & 0x3F);
+				destination[written++] = static_cast<wchar_t>(cp);
+				index += 2;
+			} else if ((lead & 0xF0) == 0xE0 && index + 2 < input_length) {
+				uint32_t const cp = ((lead & 0x0F) << 12) |
+					((static_cast<unsigned char>(source[index + 1]) & 0x3F) << 6) |
+					(static_cast<unsigned char>(source[index + 2]) & 0x3F);
+				destination[written++] = static_cast<wchar_t>(cp);
+				index += 3;
+			} else if ((lead & 0xF8) == 0xF0 && index + 3 < input_length) {
+				uint32_t const cp = ((lead & 0x07) << 18) |
+					((static_cast<unsigned char>(source[index + 1]) & 0x3F) << 12) |
+					((static_cast<unsigned char>(source[index + 2]) & 0x3F) << 6) |
+					(static_cast<unsigned char>(source[index + 3]) & 0x3F);
+				destination[written++] = static_cast<wchar_t>(cp);
+				index += 4;
+			} else {
+				destination[written++] = static_cast<wchar_t>(lead);
+				index += 1;
+			}
+		}
+		return(written);
 	}
-	if (source_length < 0) destination[copied - 1] = L'\0';
-	return(copied == required ? copied : 0);
+
+	if (!destination || destination_length == 0) return(input_length);
+	if (destination_length < input_length) return(0);
+
+	for (int index = 0; index < input_length; ++index) {
+		unsigned char const byte = static_cast<unsigned char>(source[index]);
+		if (code_page == 437 || code_page == CP_OEMCP) {
+			destination[index] = static_cast<wchar_t>(Platform::MacOS::NLS::Multi_Byte_To_Wide_437(byte));
+		} else if (code_page == 1252 || code_page == CP_ACP) {
+			destination[index] = static_cast<wchar_t>(Platform::MacOS::NLS::Multi_Byte_To_Wide_1252(byte));
+		} else {
+			destination[index] = static_cast<wchar_t>(byte);
+		}
+	}
+	return(input_length);
 }
 
-inline int WideCharToMultiByte(UINT, DWORD, wchar_t const * source, int source_length,
-	char * destination, int destination_length, char const *, BOOL *)
+inline int WideCharToMultiByte(UINT code_page, DWORD, wchar_t const * source, int source_length,
+	char * destination, int destination_length, char const * default_char, BOOL * used_default)
 {
 	if (!source) return(0);
-	int const required = source_length < 0 ? static_cast<int>(wcslen(source)) + 1 : source_length;
-	if (!destination || destination_length == 0) return(required);
-	int const copied = std::min(required, destination_length);
-	for (int index = 0; index < copied; ++index) {
-		destination[index] = source[index] <= 0xFF ? static_cast<char>(source[index]) : '?';
+
+	int const input_length = source_length < 0 ? static_cast<int>(wcslen(source)) + 1 : source_length;
+	if (input_length == 0) return(0);
+
+	if (code_page == CP_UTF8) {
+		int required = 0;
+		for (int index = 0; index < input_length; ++index) {
+			uint32_t const code = static_cast<uint32_t>(source[index]);
+			if (code < 0x80) {
+				required += 1;
+			} else if (code < 0x800) {
+				required += 2;
+			} else if (code < 0x10000) {
+				required += 3;
+			} else {
+				required += 4;
+			}
+		}
+		if (!destination || destination_length == 0) return(required);
+		if (destination_length < required) return(0);
+
+		int written = 0;
+		for (int index = 0; index < input_length; ++index) {
+			uint32_t const code = static_cast<uint32_t>(source[index]);
+			if (code < 0x80) {
+				destination[written++] = static_cast<char>(code);
+			} else if (code < 0x800) {
+				destination[written++] = static_cast<char>(0xC0 | (code >> 6));
+				destination[written++] = static_cast<char>(0x80 | (code & 0x3F));
+			} else if (code < 0x10000) {
+				destination[written++] = static_cast<char>(0xE0 | (code >> 12));
+				destination[written++] = static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+				destination[written++] = static_cast<char>(0x80 | (code & 0x3F));
+			} else {
+				destination[written++] = static_cast<char>(0xF0 | (code >> 18));
+				destination[written++] = static_cast<char>(0x80 | ((code >> 12) & 0x3F));
+				destination[written++] = static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+				destination[written++] = static_cast<char>(0x80 | (code & 0x3F));
+			}
+		}
+		if (used_default) *used_default = FALSE;
+		return(written);
 	}
-	if (source_length < 0) destination[copied - 1] = '\0';
-	return(copied == required ? copied : 0);
+
+	if (!destination || destination_length == 0) return(input_length);
+	if (destination_length < input_length) return(0);
+
+	char const fallback = (default_char && *default_char) ? *default_char : '?';
+	if (used_default) *used_default = FALSE;
+
+	for (int index = 0; index < input_length; ++index) {
+		wchar_t const wide = source[index];
+		if (wide == L'\0') {
+			destination[index] = '\0';
+			continue;
+		}
+
+		int mapped = -1;
+		if (code_page == 437 || code_page == CP_OEMCP) {
+			mapped = Platform::MacOS::NLS::Wide_To_Multi_Byte_437(static_cast<uint32_t>(wide));
+		} else if (code_page == 1252 || code_page == CP_ACP) {
+			mapped = Platform::MacOS::NLS::Wide_To_Multi_Byte_1252(static_cast<uint32_t>(wide));
+		} else {
+			if (static_cast<uint32_t>(wide) < 0x80) {
+				mapped = static_cast<int>(wide);
+			}
+		}
+
+		if (mapped >= 0) {
+			destination[index] = static_cast<char>(mapped);
+		} else {
+			destination[index] = fallback;
+			if (used_default) *used_default = TRUE;
+		}
+	}
+
+	return(input_length);
 }
 
 inline BOOL CharToOemBuff(char const * source, char * destination, DWORD length)
@@ -1885,27 +2164,6 @@ inline LPWSTR * CommandLineToArgvW(wchar_t const *, int * count)
 inline HRESULT OleInitialize(void *) { return(S_OK); }
 inline void OleUninitialize() {}
 inline HWND FindWindow(char const *, char const *) { return(nullptr); }
-
-inline void _makepath(char * path, char const *, char const * directory, char const * filename, char const * extension)
-{
-	char const * dot = extension && *extension && *extension != '.' ? "." : "";
-	std::snprintf(path, MAX_PATH, "%s%s%s%s", directory ? directory : "", filename ? filename : "",
-		dot, extension && *extension ? extension : "");
-}
-
-inline void _splitpath(char const * path, char * drive, char * directory, char * filename, char * extension)
-{
-	if (drive) drive[0] = '\0';
-	// Windows _splitpath accepts both separators, and the game builds paths with backslashes.
-	char const * slash = std::strrchr(path, '/');
-	char const * backslash = std::strrchr(path, '\\');
-	if (backslash && (!slash || backslash > slash)) slash = backslash;
-	char const * base = slash ? slash + 1 : path;
-	char const * dot = std::strrchr(base, '.');
-	if (directory) { std::size_t length = slash ? static_cast<std::size_t>(slash - path + 1) : 0; std::memcpy(directory, path, length); directory[length] = '\0'; }
-	if (filename) { std::size_t length = dot ? static_cast<std::size_t>(dot - base) : std::strlen(base); std::memcpy(filename, base, length); filename[length] = '\0'; }
-	if (extension) std::strcpy(extension, dot ? dot : "");
-}
 
 inline void OutputDebugString(char const * text) { std::fputs(text, stderr); }
 inline void OutputDebugStringA(char const * text) { OutputDebugString(text); }
@@ -2004,6 +2262,8 @@ BOOL SetCursorPos(int x, int y);
 BOOL ClipCursor(RECT const * rectangle);
 int ShowCursor(BOOL show);
 int GetSystemMetrics(int index);
+BOOL EnumDisplaySettings(LPCSTR lpszDeviceName, DWORD iModeNum, DEVMODEA * lpDevMode);
+#define EnumDisplaySettingsA EnumDisplaySettings
 BOOL InvalidateRect(HWND window, RECT const * rectangle, BOOL erase);
 BOOL ValidateRect(HWND window, RECT const * rectangle);
 HWND SetActiveWindow(HWND window);
@@ -2028,6 +2288,11 @@ inline HGDIOBJ SelectObject(HDC, HGDIOBJ object) { return(object); }
 inline BOOL DeleteObject(HGDIOBJ) { return(TRUE); }
 inline int SetBkMode(HDC, int mode) { return(mode); }
 inline COLORREF SetTextColor(HDC, COLORREF color) { return(color); }
+
+constexpr int LOGPIXELSX = 88;
+constexpr int LOGPIXELSY = 90;
+constexpr int VREFRESH = 116;
+int GetDeviceCaps(HDC context, int index);
 inline BOOL GetTextExtentPoint32(HDC, LPCSTR text, int length, SIZE * size)
 {
 	if (!size) return(FALSE);
@@ -2081,7 +2346,12 @@ SHORT GetKeyState(int key);
 SHORT GetAsyncKeyState(int key);
 UINT MapVirtualKey(UINT code, UINT map_type);
 int ToAscii(UINT key, UINT scan_code, BYTE const * state, WORD * result, UINT flags);
+int ToUnicode(UINT key, UINT scan_code, BYTE const * state, LPWSTR buffer, int size, UINT flags);
 int GetKeyNameText(LONG lparam, LPSTR buffer, int size);
+
+#ifndef IS_SURROGATE_PAIR
+#define IS_SURROGATE_PAIR(hs, ls) (((hs) >= 0xD800 && (hs) <= 0xDBFF) && ((ls) >= 0xDC00 && (ls) <= 0xDFFF))
+#endif
 
 inline BOOL TextOut(HDC, int, int, LPCSTR, int) { return(TRUE); }
 
@@ -2096,6 +2366,7 @@ HRSRC FindResource(HMODULE module, LPCSTR name, LPCSTR type);
 HGLOBAL LoadResource(HMODULE module, HRSRC resource);
 LPVOID LockResource(HGLOBAL resource);
 DWORD GetModuleFileName(HMODULE module, LPSTR path, DWORD size);
+inline HMODULE GetModuleHandle(LPCSTR = nullptr) { return nullptr; }
 void const * OpenTSMacOS_Find_Dialog_Template(HMODULE preferred, LPCSTR name);
 char OpenTSMacOS_To_CP1252(unsigned short character);
 
@@ -2103,6 +2374,22 @@ char OpenTSMacOS_To_CP1252(unsigned short character);
 #define LoadStringA LoadString
 #define FindResourceA FindResource
 #define GetModuleFileNameA GetModuleFileName
+#define GetModuleHandleA GetModuleHandle
+
+inline unsigned int _controlfp(unsigned int, unsigned int)
+{
+#if defined(__x86_64__)
+	unsigned short cw = 0;
+	__asm__ volatile("fnstcw %0" : "=m"(cw));
+	return cw;
+#elif defined(__aarch64__)
+	uint64_t fpcr = 0;
+	__asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+	return static_cast<unsigned int>(fpcr);
+#else
+	return 0;
+#endif
+}
 
 namespace OpenTSMacOS
 {
@@ -2220,4 +2507,123 @@ inline HRESULT CoCreateInstance(REFCLSID class_id, IUnknown * outer, DWORD, REFI
 		if (entry.ClassIdentifier == class_id) return(entry.Factory->CreateInstance(outer, interface_id, object));
 	}
 	return(E_FAIL);
+}
+
+class MemoryStream final : public IStream
+{
+public:
+	MemoryStream() : References_(1), Position_(0) {}
+
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID identifier, void ** result) override
+	{
+		if (!result) return(E_POINTER);
+		*result = nullptr;
+		if (identifier == IID_IUnknown || identifier == IID_IStream || identifier == IID_ISequentialStream) {
+			*result = static_cast<IStream *>(this);
+		}
+		if (!*result) return(E_NOINTERFACE);
+		AddRef();
+		return(S_OK);
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef(void) override { return(++References_); }
+	ULONG STDMETHODCALLTYPE Release(void) override
+	{
+		ULONG const count = --References_;
+		if (count == 0) delete this;
+		return(count);
+	}
+
+	HRESULT STDMETHODCALLTYPE Read(void * destination, ULONG count, ULONG * read) override
+	{
+		if (read) *read = 0;
+		if (!destination && count) return(STG_E_INVALIDPOINTER);
+		std::size_t const available = Position_ < Buffer_.size() ? Buffer_.size() - static_cast<std::size_t>(Position_) : 0;
+		std::size_t const amount = std::min<std::size_t>(count, available);
+		if (amount) std::memcpy(destination, Buffer_.data() + Position_, amount);
+		Position_ += amount;
+		if (read) *read = static_cast<ULONG>(amount);
+		return(amount == count ? S_OK : S_FALSE);
+	}
+
+	HRESULT STDMETHODCALLTYPE Write(void const * source, ULONG count, ULONG * written) override
+	{
+		if (written) *written = 0;
+		if (!source && count) return(STG_E_INVALIDPOINTER);
+		if (static_cast<std::size_t>(Position_ + count) > Buffer_.size()) {
+			Buffer_.resize(static_cast<std::size_t>(Position_ + count));
+		}
+		if (count) std::memcpy(Buffer_.data() + Position_, source, count);
+		Position_ += count;
+		if (written) *written = count;
+		return(S_OK);
+	}
+
+	HRESULT STDMETHODCALLTYPE Seek(LARGE_INTEGER move, DWORD origin, ULARGE_INTEGER * new_position) override
+	{
+		std::int64_t target = 0;
+		switch (origin) {
+			case STREAM_SEEK_SET: target = move.QuadPart; break;
+			case STREAM_SEEK_CUR: target = static_cast<std::int64_t>(Position_) + move.QuadPart; break;
+			case STREAM_SEEK_END: target = static_cast<std::int64_t>(Buffer_.size()) + move.QuadPart; break;
+			default: return(STG_E_INVALIDFUNCTION);
+		}
+		if (target < 0) return(STG_E_INVALIDFUNCTION);
+		Position_ = static_cast<std::uint64_t>(target);
+		if (new_position) new_position->QuadPart = Position_;
+		return(S_OK);
+	}
+
+	HRESULT STDMETHODCALLTYPE SetSize(ULARGE_INTEGER new_size) override
+	{
+		Buffer_.resize(static_cast<std::size_t>(new_size.QuadPart));
+		return(S_OK);
+	}
+
+	HRESULT STDMETHODCALLTYPE CopyTo(IStream * target, ULARGE_INTEGER count, ULARGE_INTEGER * read, ULARGE_INTEGER * written) override
+	{
+		if (!target) return(E_POINTER);
+		std::size_t const available = Position_ < Buffer_.size() ? Buffer_.size() - static_cast<std::size_t>(Position_) : 0;
+		std::size_t const amount = std::min<std::size_t>(static_cast<std::size_t>(count.QuadPart), available);
+		ULONG out_written = 0;
+		HRESULT const hr = target->Write(Buffer_.data() + Position_, static_cast<ULONG>(amount), &out_written);
+		Position_ += amount;
+		if (read) read->QuadPart = amount;
+		if (written) written->QuadPart = out_written;
+		return(hr);
+	}
+
+	HRESULT STDMETHODCALLTYPE Commit(DWORD) override { return(S_OK); }
+	HRESULT STDMETHODCALLTYPE Revert(void) override { return(S_OK); }
+	HRESULT STDMETHODCALLTYPE LockRegion(ULARGE_INTEGER, ULARGE_INTEGER, DWORD) override { return(STG_E_INVALIDFUNCTION); }
+	HRESULT STDMETHODCALLTYPE UnlockRegion(ULARGE_INTEGER, ULARGE_INTEGER, DWORD) override { return(STG_E_INVALIDFUNCTION); }
+	HRESULT STDMETHODCALLTYPE Stat(STATSTG * stat, DWORD) override
+	{
+		if (!stat) return(E_POINTER);
+		*stat = {};
+		stat->type = STGTY_STREAM;
+		stat->cbSize.QuadPart = Buffer_.size();
+		return(S_OK);
+	}
+	HRESULT STDMETHODCALLTYPE Clone(IStream ** clone) override
+	{
+		if (!clone) return(E_POINTER);
+		auto * copy = new MemoryStream();
+		copy->Buffer_ = Buffer_;
+		copy->Position_ = Position_;
+		*clone = copy;
+		return(S_OK);
+	}
+
+private:
+	std::atomic<ULONG> References_;
+	std::vector<std::uint8_t> Buffer_;
+	std::uint64_t Position_;
+};
+
+inline HRESULT CreateStreamOnHGlobal(HGLOBAL, BOOL, IStream ** stream)
+{
+	if (!stream) return(E_POINTER);
+	*stream = new MemoryStream();
+	return(S_OK);
 }

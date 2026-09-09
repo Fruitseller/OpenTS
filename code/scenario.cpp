@@ -904,10 +904,7 @@ void Fill_In_Data(void)
 		if (tp->Attaches_To() & ATTACH_HOUSE) {
 			TagClass * tt = Find_Or_Make(tp);
 			if (tt && tt->Class && tt->Class->FirstTrigger && tt->Class->FirstTrigger->House) {
-				HouseClass * house = House_From_HousesType(tt->Class->FirstTrigger->House->House);
-				if (house) {
-					house->HouseTags.Add(tt);
-				}
+				tt->Class->FirstTrigger->House->HouseTags.Add(tt);
 			}
 		}
 	}

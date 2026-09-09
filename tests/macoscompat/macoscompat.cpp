@@ -33,7 +33,7 @@ struct IsoTileSetTestAccess
 		tile_set.MapHeight = 0;
 		tile_set.Width = 0;
 		tile_set.Height = 0;
-		tile_set.Tiles[0] = 0;
+		tile_set.TileOffsets[0] = 0;
 
 		IsoTileSet const & view = tile_set;
 		Check(view.Tile_Count() == 0, "empty tile set reports no records");
@@ -47,7 +47,7 @@ struct IsoTileSetTestAccess
 		tile_set.MapHeight = 1;
 		tile_set.Width = 60;
 		tile_set.Height = 30;
-		tile_set.Tiles[0] = 0;
+		tile_set.TileOffsets[0] = 0;
 
 		IsoTileSet const & view = tile_set;
 		Check(view.Tile_Count() == 1, "single-tile set reports one record");

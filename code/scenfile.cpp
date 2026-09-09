@@ -11,6 +11,10 @@
 
 #include <cstring>
 #include <utility>
+#if !defined(_WIN32)
+#include <strings.h>
+#define _stricmp strcasecmp
+#endif
 
 
 bool ScenarioFileClass::Matches(char const * name) const
