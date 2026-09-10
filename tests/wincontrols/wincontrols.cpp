@@ -315,6 +315,8 @@ namespace
 		static inline int LastCommandId = -1;
 		static inline int CommandCount = 0;
 		static inline int LastDrawItemAction = -1;
+		static inline int LastCommandCheckState = -1;
+		static inline HWND DependentCheckbox = nullptr;
 	};
 
 	INT_PTR CALLBACK Recording_Dlg_Proc(HWND, UINT message, WPARAM wparam, LPARAM lparam)
@@ -322,6 +324,14 @@ namespace
 		if (message == WM_COMMAND) {
 			DialogProcRecorder::LastCommandId = LOWORD(wparam);
 			DialogProcRecorder::CommandCount++;
+			if (lparam != 0) {
+				DialogProcRecorder::LastCommandCheckState = static_cast<int>(SendMessage(reinterpret_cast<HWND>(lparam), BM_GETCHECK, 0, 0));
+			}
+			if (LOWORD(wparam) == 101 && DialogProcRecorder::DependentCheckbox != nullptr) {
+				if (DialogProcRecorder::LastCommandCheckState == BST_CHECKED) {
+					SendMessage(DialogProcRecorder::DependentCheckbox, BM_SETCHECK, BST_CHECKED, 0);
+				}
+			}
 			return(TRUE);
 		}
 		if (message == WM_DRAWITEM) {
@@ -337,6 +347,8 @@ namespace
 		DialogProcRecorder::LastCommandId = -1;
 		DialogProcRecorder::CommandCount = 0;
 		DialogProcRecorder::LastDrawItemAction = -1;
+		DialogProcRecorder::LastCommandCheckState = -1;
+		DialogProcRecorder::DependentCheckbox = nullptr;
 
 		HWND const dialog = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, Recording_Dlg_Proc, 0);
 		Check(dialog != nullptr, "recording dialog created");
@@ -359,10 +371,19 @@ namespace
 			10, 40, 80, 20, dialog, reinterpret_cast<HMENU>(101), nullptr, nullptr);
 		Check(SendMessage(chk, BM_GETCHECK, 0, 0) == BST_UNCHECKED, "checkbox initial state is unchecked");
 
+		HWND const chk_dep = CreateWindowEx(0, "Button", "Dependent", WS_VISIBLE | BS_AUTOCHECKBOX,
+			10, 65, 80, 20, dialog, reinterpret_cast<HMENU>(102), nullptr, nullptr);
+		DialogProcRecorder::DependentCheckbox = chk_dep;
+		DialogProcRecorder::LastCommandCheckState = -1;
+
 		SendMessage(chk, WM_LBUTTONDOWN, 0, MAKELPARAM(5, 5));
 		SendMessage(chk, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
 		Check(SendMessage(chk, BM_GETCHECK, 0, 0) == BST_CHECKED, "checkbox toggles to checked on click");
 		Check(DialogProcRecorder::LastCommandId == 101, "checkbox click sends WM_COMMAND to dialog");
+		Check(DialogProcRecorder::LastCommandCheckState == BST_CHECKED, "WM_COMMAND handler reads toggled checkbox state");
+		Check(SendMessage(chk_dep, BM_GETCHECK, 0, 0) == BST_CHECKED, "dependent checkbox checked via BM_SETCHECK inside command handler");
+
+		DialogProcRecorder::DependentCheckbox = nullptr;
 
 		DialogProcRecorder::LastDrawItemAction = -1;
 		SendMessage(chk, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
