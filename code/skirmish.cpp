@@ -98,6 +98,7 @@ void Skirmish_On_WM_COMMAND(HWND window, int message, WPARAM wparam, LPARAM lpar
 					Session.PrefColor = Session.ColorIdx;
 				}
 
+				Clear_Vector(&Session.Players);
 				NodeNameType * who = new NodeNameType;
 				if (who) {
 					strcpy(who->Name, Session.Handle);
@@ -155,22 +156,23 @@ void Skirmish_On_WM_COMMAND(HWND window, int message, WPARAM wparam, LPARAM lpar
 
 		case IDC_MULTIMAP: {
 			int old_scen = Session.Options.ScenarioIndex;
-			strcpy(buffer, Session.ScenarioFileName);
-			strcpy(buffer, Session.Options.ScenarioDescription);
 			ShowWindow(window, SW_HIDE);
 			if (Scenario_Dialog(MainWindow) == IDCANCEL) {
 				Session.Options.ScenarioIndex = old_scen;
 				Set_Scenario_Info_From_Index(old_scen);
-				Update_Network_Dialog_Preview(window);
 				ShowWindow(window, SW_SHOW);
-				if (stricmp(Session.Scenarios[Session.Options.ScenarioIndex]->Get_Filename(), RANDOM_MAP_FILE_NAME) == 0) {
-					delete MultiplayerMapPreview;
-					MultiplayerMapPreview = new MapPreviewClass;
-					MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
-					if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
-						Update_Network_Dialog_Preview(window);
+				if (Session.Scenarios.Count() > 0 && stricmp(Session.Scenarios[Session.Options.ScenarioIndex]->Get_Filename(), RANDOM_MAP_FILE_NAME) == 0) {
+					if (MultiplayerMapPreview != NULL) {
+						delete MultiplayerMapPreview;
+						MultiplayerMapPreview = NULL;
 					}
-					InvalidateRect(window, NULL, FALSE);
+					MultiplayerMapPreview = new MapPreviewClass;
+					if (MultiplayerMapPreview != NULL) {
+						MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
+						if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
+							Update_Network_Dialog_Preview(window);
+						}
+					}
 				} else {
 					Update_Network_Dialog_Preview(window);
 				}
@@ -179,22 +181,27 @@ void Skirmish_On_WM_COMMAND(HWND window, int message, WPARAM wparam, LPARAM lpar
 				ShowWindow(window, SW_SHOW);
 				if (Set_Scenario_Info_From_Index(Session.Options.ScenarioIndex) == true) {
 					SendDlgItemMessage(window, IDC_SCENARIONAME, WM_SETTEXT, 0, (LPARAM)Session.Options.ScenarioDescription);
-					if (stricmp(Session.Scenarios[Session.Options.ScenarioIndex]->Get_Filename(), "RandMap.Sed") == 0) {
+					if (Session.Scenarios.Count() > 0 && stricmp(Session.Scenarios[Session.Options.ScenarioIndex]->Get_Filename(), RANDOM_MAP_FILE_NAME) == 0) {
 						if (MultiplayerMapPreview != NULL) {
 							delete MultiplayerMapPreview;
-							MultiplayerMapPreview = new MapPreviewClass;
+							MultiplayerMapPreview = NULL;
+						}
+						MultiplayerMapPreview = new MapPreviewClass;
+						if (MultiplayerMapPreview != NULL) {
 							MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
+							if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
+								Update_Network_Dialog_Preview(window);
+							}
 						}
-						if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
-							Update_Network_Dialog_Preview(window);
-						}
-						InvalidateRect(window, NULL, FALSE);
 					} else {
 						Update_Network_Dialog_Preview(window);
 					}
 				} else {
 					Session.Options.ScenarioIndex = old_scen;
+					Set_Scenario_Info_From_Index(old_scen);
+					Update_Network_Dialog_Preview(window);
 				}
+				InvalidateRect(window, NULL, FALSE);
 			}
 		}
 			break;
@@ -232,7 +239,7 @@ bool Skirmish_Mode_Dialog(void)
 		SetWindowLongPtr(dialog, DWLP_USER, (LONG_PTR)&rc);
 		OwnerDraw::Display_Dialog(dialog);
 		while (rc != IDOK && rc != IDCANCEL) {
-			if (OwnerDraw::Dialog_Message_Handler() == IDOK) {
+			if (OwnerDraw::Dialog_Message_Handler()) {
 				break;
 			}
 			Title_Screen_Restore();
@@ -383,7 +390,10 @@ BOOL Skirmish_On_WM_INITDIALOG(HWND window, WPARAM wparam, LPARAM lparam)
 	}
 
 	handle = GetDlgItem(window, IDC_SKIRMISH_NAME);
-	if (handle) SetWindowText(handle, Session.Handle);
+	if (handle) {
+		SendDlgItemMessage(window, IDC_SKIRMISH_NAME, EM_SETLIMITTEXT, sizeof(Session.Handle) - 1, 0);
+		SetWindowText(handle, Session.Handle);
+	}
 
 	handle = GetDlgItem(window, IDC_SKIRMISH_SIDE);
 	if (handle) {
@@ -406,9 +416,17 @@ BOOL Skirmish_On_WM_INITDIALOG(HWND window, WPARAM wparam, LPARAM lparam)
 		SendDlgItemMessage(window, IDC_SKIRMISH_COLOR, OD_SETCOLOR, player, (LPARAM)PlayerColorTable[player]);
 	}
 
-	Set_Scenario_Info_From_Index(0);
-	Session.Options.ScenarioIndex = 0;
-	SendDlgItemMessage(window, IDC_SCENARIONAME, WM_SETTEXT, 0, (LPARAM)Session.Options.ScenarioDescription);
+	int initial_scenario = 0;
+	if (Session.Options.ScenarioIndex >= 0 && Session.Options.ScenarioIndex < Session.Scenarios.Count()) {
+		if (CCFileClass(Session.Scenarios[Session.Options.ScenarioIndex]->Get_Filename()).Is_Available()) {
+			initial_scenario = Session.Options.ScenarioIndex;
+		}
+	}
+	if (Session.Scenarios.Count() > 0) {
+		Set_Scenario_Info_From_Index(initial_scenario);
+		Session.Options.ScenarioIndex = initial_scenario;
+		SendDlgItemMessage(window, IDC_SCENARIONAME, WM_SETTEXT, 0, (LPARAM)Session.Options.ScenarioDescription);
+	}
 	Clear_Vector(&Session.Players);
 	Clear_Vector(&Session.Computers);
 
@@ -433,6 +451,21 @@ BOOL Skirmish_On_WM_INITDIALOG(HWND window, WPARAM wparam, LPARAM lparam)
 	handle = GetDlgItem(window, IDC_SHORT_GAME);
 	if (handle) Button_SetCheck(handle, Session.Options.ShortGame ? BST_CHECKED : BST_UNCHECKED);
 
-	Update_Network_Dialog_Preview(window);
+	if (Session.Scenarios.Count() > 0 && stricmp(Session.Scenarios[Session.Options.ScenarioIndex]->Get_Filename(), RANDOM_MAP_FILE_NAME) == 0) {
+		if (MultiplayerMapPreview != NULL) {
+			delete MultiplayerMapPreview;
+			MultiplayerMapPreview = NULL;
+		}
+		MultiplayerMapPreview = new MapPreviewClass;
+		if (MultiplayerMapPreview != NULL) {
+			MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
+			if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
+				Update_Network_Dialog_Preview(window);
+			}
+		}
+		InvalidateRect(window, NULL, FALSE);
+	} else {
+		Update_Network_Dialog_Preview(window);
+	}
 	return(FALSE);
 }

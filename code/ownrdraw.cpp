@@ -2925,7 +2925,15 @@ LRESULT CALLBACK CheckBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 	switch (message) {
 
 		case BM_GETCHECK: {
-			return(data->CheckBox.checkState);
+			if (data != NULL) {
+				return(data->CheckBox.checkState);
+			}
+			WNDPROC subproc = NULL;
+			OriginalWndProcs.getValue(window, subproc);
+			if (subproc != NULL) {
+				return(CallWindowProc(subproc, window, message, wparam, lparam));
+			}
+			return(BST_UNCHECKED);
 		}
 
 		case WM_SETFOCUS:
@@ -2989,7 +2997,9 @@ LRESULT CALLBACK CheckBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 		}
 
 		case BM_SETCHECK: {
-			data->CheckBox.checkState = wparam;
+			if (data != NULL) {
+				data->CheckBox.checkState = wparam;
+			}
 			InvalidateRect(window, NULL, FALSE);
 			WNDPROC subproc = NULL;
 			OriginalWndProcs.getValue(window, subproc);
@@ -3006,17 +3016,19 @@ LRESULT CALLBACK CheckBoxCtrlProc(HWND window, UINT message, WPARAM wparam, LPAR
 			RECT cr;
 			GetClientRect(window, &cr);
 			if (xpos >= 0 && ypos >= 0 && xpos < cr.right && ypos < cr.bottom) {
-				int checked = data->CheckBox.checkState != 1;
-				data->CheckBox.checkState = checked;
+				int checked = (data != NULL && data->CheckBox.checkState != 1) ? 1 : 0;
+				if (data != NULL) {
+					data->CheckBox.checkState = checked;
+				}
 				InvalidateRect(window, NULL, FALSE);
 				Sound_Effect(Rule->GenericClick);
-				HWND parent = GetParent(window);
-				SendMessage(parent, WM_COMMAND, MAKEWPARAM(GetWindowLong(window, GWL_ID), checked), (LPARAM)window);
 				WNDPROC subproc = NULL;
 				OriginalWndProcs.getValue(window, subproc);
 				if (subproc != NULL) {
 					CallWindowProc(subproc, window, BM_SETCHECK, checked, 0);
 				}
+				HWND parent = GetParent(window);
+				SendMessage(parent, WM_COMMAND, MAKEWPARAM(GetWindowLong(window, GWL_ID), checked), (LPARAM)window);
 				return(0);
 			} else {
 				return(0);

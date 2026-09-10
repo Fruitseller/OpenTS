@@ -1133,12 +1133,17 @@ bool Scenario_Select_Callback(void)
 	int index = SendDlgItemMessage(ScenarioPick, IDC_AILEVEL_SLIDER, LB_GETCURSEL, 0, 0);
 	if (index != LastPreviewedScenario && index != -1) {
 		Set_Scenario_Info_From_Index(index);
-		if (stricmp(Session.Scenarios[index]->Get_Filename(), "RandMap.Sed") == 0) {
-			delete MultiplayerMapPreview;
+		if (stricmp(Session.Scenarios[index]->Get_Filename(), RANDOM_MAP_FILE_NAME) == 0) {
+			if (MultiplayerMapPreview != NULL) {
+				delete MultiplayerMapPreview;
+				MultiplayerMapPreview = NULL;
+			}
 			MultiplayerMapPreview = new MapPreviewClass;
-			MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
-			if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
-				Update_Network_Dialog_Preview(ScenarioPick);
+			if (MultiplayerMapPreview != NULL) {
+				MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
+				if (MultiplayerMapPreview->Get_Preview_Surface() == NULL) {
+					Update_Network_Dialog_Preview(ScenarioPick);
+				}
 			}
 			InvalidateRect(ScenarioPick, NULL, FALSE);
 		} else {
@@ -1235,7 +1240,7 @@ INT_PTR CALLBACK Scenario_DlgProc(HWND window, UINT message, WPARAM wparam, LPAR
 						}
 						SendDlgItemMessage(window, IDC_AILEVEL_SLIDER, LB_SETCURSEL, scenario, 0);
 						Set_Scenario_Info_From_Index(scenario);
-						if (!MultiplayerMapPreview->Get_Preview_Surface()) {
+						if (!MultiplayerMapPreview || !MultiplayerMapPreview->Get_Preview_Surface()) {
 							Update_Network_Dialog_Preview(window);
 						}
 						Session.Options.ScenarioIndex = OriginalScenario;
@@ -1626,15 +1631,20 @@ int CreateRandomMap(void)
 	}
 
 	if (result != IDOK) {
-		return(0);
+		return(-1);
 	}
 
 	IsRandomMap = true;
 	RandomMapGen.SeedData.Save(RANDOM_MAP_FILE_NAME);
 
-	delete MultiplayerMapPreview;
+	if (MultiplayerMapPreview != NULL) {
+		delete MultiplayerMapPreview;
+		MultiplayerMapPreview = NULL;
+	}
 	MultiplayerMapPreview = new MapPreviewClass;
-	MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
+	if (MultiplayerMapPreview != NULL) {
+		MultiplayerMapPreview->Read_PCX_Preview("RandMap.img");
+	}
 
 	int index;
 	bool found = false;
