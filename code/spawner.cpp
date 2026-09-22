@@ -381,7 +381,7 @@ static bool Spawner_Resume(bool & gameloaded)
 		return(Spawner_Refuse("The saved game %s is missing or unreadable.", SpawnConfig.SaveGameName.c_str()));
 	}
 
-	if (!info.Is_Compatible(ExpectedGameVersion)) {
+	if (info.Get_Internal_Version() != ExpectedGameVersion) {
 		return(Spawner_Refuse("The saved game is incompatible with this build."));
 	}
 

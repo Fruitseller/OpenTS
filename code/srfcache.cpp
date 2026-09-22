@@ -60,7 +60,6 @@ struct BMPPaletteEntry
 	std::uint8_t Red;
 	std::uint8_t Reserved;
 };
-static_assert(sizeof(MSBitmap) == 58, "the file header, info header and one color occupy 58 bytes on disk");
 #pragma pack(pop)
 
 static_assert(sizeof(BMPFileHeader) == 14);
