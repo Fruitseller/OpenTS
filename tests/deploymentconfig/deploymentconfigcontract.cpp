@@ -95,7 +95,11 @@ void Remove_Root(void)
 
 	// The tree is shallow and entirely this harness's own, so it is removed by name.
 	char command[MAX_PATH + 32];
+#ifdef _WIN32
 	std::snprintf(command, sizeof(command), "cmd /c rd /s /q \"%s\"", Root.c_str());
+#else
+	std::snprintf(command, sizeof(command), "rm -rf \"%s\"", Root.c_str());
+#endif
 	system(command);
 }
 

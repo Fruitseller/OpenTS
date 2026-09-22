@@ -105,7 +105,6 @@ using LPSOCKADDR = struct sockaddr *;
 using LANGID = unsigned short;
 using LCID = std::uint32_t;
 using DISPID = long;
-using VARTYPE = unsigned short;
 using VARIANT_BOOL = short;
 constexpr VARIANT_BOOL VARIANT_FALSE = 0;
 constexpr VARIANT_BOOL VARIANT_TRUE = -1;
@@ -143,7 +142,6 @@ using LPCSTR = char const *;
 using LPCTSTR = char const *;
 using LPWSTR = wchar_t *;
 using LPCWSTR = wchar_t const *;
-using LPOLESTR = wchar_t *;
 using LPBYTE = BYTE *;
 using PBYTE = BYTE *;
 using LPWORD = WORD *;
@@ -164,14 +162,6 @@ constexpr HRESULT E_POINTER = static_cast<HRESULT>(0x80004003L);
 constexpr HRESULT E_INVALIDARG = static_cast<HRESULT>(0x80070057L);
 constexpr HRESULT E_OUTOFMEMORY = static_cast<HRESULT>(0x8007000EL);
 constexpr HRESULT CLASS_E_NOAGGREGATION = static_cast<HRESULT>(0x80040110L);
-constexpr HRESULT STG_E_INVALIDFUNCTION = static_cast<HRESULT>(0x80030001L);
-constexpr HRESULT STG_E_FILENOTFOUND = static_cast<HRESULT>(0x80030002L);
-constexpr HRESULT STG_E_ACCESSDENIED = static_cast<HRESULT>(0x80030005L);
-constexpr HRESULT STG_E_READFAULT = static_cast<HRESULT>(0x8003001EL);
-constexpr HRESULT STG_E_WRITEFAULT = static_cast<HRESULT>(0x8003001DL);
-constexpr HRESULT STG_E_INVALIDPOINTER = static_cast<HRESULT>(0x80030009L);
-constexpr HRESULT STG_E_FILEALREADYEXISTS = static_cast<HRESULT>(0x80030050L);
-constexpr HRESULT STG_E_MEDIUMFULL = static_cast<HRESULT>(0x80030070L);
 constexpr UINT CP_ACP = 0;
 constexpr DWORD MB_PRECOMPOSED = 1;
 constexpr WORD LANG_NEUTRAL = 0;
@@ -822,20 +812,6 @@ constexpr DWORD WAIT_TIMEOUT = 258;
 constexpr DWORD WAIT_FAILED = 0xFFFFFFFFu;
 constexpr DWORD INFINITE = 0xFFFFFFFFu;
 constexpr DWORD MUTEX_ALL_ACCESS = 0x001F0001;
-constexpr DWORD STGM_SHARE_DENY_WRITE = 0x00000020L;
-constexpr DWORD STGM_SHARE_EXCLUSIVE = 0x00000010L;
-constexpr DWORD STGTY_STORAGE = 1;
-constexpr DWORD STGTY_STREAM = 2;
-constexpr DWORD STATFLAG_NONAME = 1;
-constexpr DWORD CLSCTX_INPROC = 1;
-constexpr ULONG PRSPEC_LPWSTR = 0;
-constexpr ULONG PRSPEC_PROPID = 1;
-constexpr DWORD PROPSETFLAG_DEFAULT = 0;
-constexpr ULONG PID_FIRST_USABLE = 2;
-constexpr VARTYPE VT_EMPTY = 0;
-constexpr VARTYPE VT_I4 = 3;
-constexpr VARTYPE VT_LPWSTR = 31;
-constexpr VARTYPE VT_FILETIME = 64;
 
 namespace OpenTSMacOS
 {
@@ -1285,6 +1261,58 @@ inline BOOL MoveFile(char const * existing_name, char const * new_name)
 	return FALSE;
 }
 
+constexpr DWORD MOVEFILE_REPLACE_EXISTING = 0x1;
+constexpr DWORD INVALID_FILE_SIZE = 0xFFFFFFFFu;
+
+// rename() already replaces an existing destination atomically.
+inline BOOL MoveFileExA(char const * existing_name, char const * new_name, DWORD)
+{
+	return MoveFile(existing_name, new_name);
+}
+
+inline BOOL FlushFileBuffers(HANDLE handle)
+{
+	if (!handle || handle == INVALID_HANDLE_VALUE) { SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
+	auto * base = static_cast<OpenTSMacOS::HandleBase *>(handle);
+	if (base->Kind != OpenTSMacOS::HandleKind::File) { SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
+	if (fsync(static_cast<OpenTSMacOS::FileHandle *>(base)->Descriptor) != 0) { SetLastError(errno); return FALSE; }
+	return TRUE;
+}
+
+struct WIN32_FILE_ATTRIBUTE_DATA
+{
+	DWORD dwFileAttributes;
+	FILETIME ftCreationTime;
+	FILETIME ftLastAccessTime;
+	FILETIME ftLastWriteTime;
+	DWORD nFileSizeHigh;
+	DWORD nFileSizeLow;
+};
+
+enum GET_FILEEX_INFO_LEVELS { GetFileExInfoStandard };
+
+inline BOOL GetFileAttributesEx(char const * path, GET_FILEEX_INFO_LEVELS, void * result)
+{
+	std::string const native = OpenTSMacOS::NativePath(path);
+	struct stat info = {};
+	if (stat(native.c_str(), &info) != 0) { SetLastError(errno); return FALSE; }
+	auto * data = static_cast<WIN32_FILE_ATTRIBUTE_DATA *>(result);
+	data->dwFileAttributes = S_ISDIR(info.st_mode) ? FILE_ATTRIBUTE_DIRECTORY : FILE_ATTRIBUTE_NORMAL;
+	data->ftCreationTime = OpenTSMacOSFileTime(info.st_birthtimespec.tv_sec, info.st_birthtimespec.tv_nsec, 0);
+	data->ftLastAccessTime = OpenTSMacOSFileTime(info.st_atimespec.tv_sec, info.st_atimespec.tv_nsec, 0);
+	data->ftLastWriteTime = OpenTSMacOSFileTime(info.st_mtimespec.tv_sec, info.st_mtimespec.tv_nsec, 0);
+	data->nFileSizeHigh = static_cast<DWORD>(static_cast<std::uint64_t>(info.st_size) >> 32);
+	data->nFileSizeLow = static_cast<DWORD>(info.st_size);
+	return TRUE;
+}
+
+inline void GetSystemTimeAsFileTime(FILETIME * result)
+{
+	struct timespec now = {};
+	clock_gettime(CLOCK_REALTIME, &now);
+	*result = OpenTSMacOSFileTime(now.tv_sec, now.tv_nsec, 0);
+}
+
 #define DeleteFileA DeleteFile
 #define CopyFileA CopyFile
 #define MoveFileA MoveFile
@@ -1379,13 +1407,11 @@ struct _GUID {
 using GUID = _GUID;
 using IID = GUID;
 using CLSID = GUID;
-using FMTID = GUID;
 #define __IID_DEFINED__
 #define CLSID_DEFINED
 using REFGUID = GUID const &;
 using REFIID = IID const &;
 using REFCLSID = CLSID const &;
-using REFFMTID = FMTID const &;
 
 inline bool operator==(GUID const & left, GUID const & right)
 {
@@ -1398,267 +1424,12 @@ inline bool operator!=(GUID const & left, GUID const & right)
 }
 
 inline constexpr GUID IID_IUnknown = {0x00000000, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_ISequentialStream = {0x0C733A30, 0x2A1C, 0x11CE, {0xAD, 0xE5, 0x00, 0xAA, 0x00, 0x44, 0x77, 0x3D}};
-inline constexpr GUID IID_IStream = {0x0000000C, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_IStorage = {0x0000000B, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_IPersist = {0x0000010C, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_IPersistStream = {0x00000109, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_IClassFactory = {0x00000001, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_IPropertyStorage = {0x00000138, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr GUID IID_IPropertySetStorage = {0x0000013A, 0, 0, {0xC0, 0, 0, 0, 0, 0, 0, 0x46}};
-inline constexpr FMTID FMTID_SummaryInformation = {
-	0xF29F85E0, 0x4FF9, 0x1068, {0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3, 0xD9}};
-
-struct STATSTG {
-	LPOLESTR pwcsName;
-	DWORD type;
-	ULARGE_INTEGER cbSize;
-	FILETIME mtime;
-	FILETIME ctime;
-	FILETIME atime;
-	DWORD grfMode;
-	DWORD grfLocksSupported;
-	CLSID clsid;
-	DWORD grfStateBits;
-	DWORD reserved;
-};
-
-using PROPID = ULONG;
-using SNB = LPOLESTR *;
-struct IUnknown;
-struct IStream;
-struct IStorage;
-struct IEnumSTATSTG;
-struct IEnumSTATPROPSTG;
-struct IEnumSTATPROPSETSTG;
-
-struct PROPSPEC {
-	ULONG ulKind;
-	union {
-		PROPID propid;
-		LPOLESTR lpwstr;
-	};
-};
-
-struct PROPVARIANT {
-	VARTYPE vt;
-	WORD wReserved1;
-	WORD wReserved2;
-	WORD wReserved3;
-	union {
-		LONG lVal;
-		ULONG ulVal;
-		FILETIME filetime;
-		LPSTR pszVal;
-		LPWSTR pwszVal;
-		IUnknown * punkVal;
-		IStream * pStream;
-		IStorage * pStorage;
-	};
-};
-
-struct STATPROPSETSTG {
-	FMTID fmtid;
-	CLSID clsid;
-	DWORD grfFlags;
-	FILETIME mtime;
-	FILETIME ctime;
-	FILETIME atime;
-	DWORD dwOSVersion;
-};
-
 struct DECLSPEC_UUID("00000000-0000-0000-C000-000000000046") IUnknown {
 	virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void **) = 0;
 	virtual ULONG STDMETHODCALLTYPE AddRef(void) = 0;
 	virtual ULONG STDMETHODCALLTYPE Release(void) = 0;
 	protected: virtual ~IUnknown(void) = default;
 };
-
-struct DECLSPEC_UUID("0C733A30-2A1C-11CE-ADE5-00AA0044773D") ISequentialStream : IUnknown {
-	virtual HRESULT STDMETHODCALLTYPE Read(void *, ULONG, ULONG *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Write(void const *, ULONG, ULONG *) = 0;
-};
-
-struct DECLSPEC_UUID("0000000C-0000-0000-C000-000000000046") IStream : ISequentialStream {
-	virtual HRESULT STDMETHODCALLTYPE Seek(LARGE_INTEGER, DWORD, ULARGE_INTEGER *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetSize(ULARGE_INTEGER) = 0;
-	virtual HRESULT STDMETHODCALLTYPE CopyTo(IStream *, ULARGE_INTEGER, ULARGE_INTEGER *, ULARGE_INTEGER *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Commit(DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Revert(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE LockRegion(ULARGE_INTEGER, ULARGE_INTEGER, DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE UnlockRegion(ULARGE_INTEGER, ULARGE_INTEGER, DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Stat(STATSTG *, DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Clone(IStream **) = 0;
-};
-
-struct DECLSPEC_UUID("0000000B-0000-0000-C000-000000000046") IStorage : IUnknown {
-	virtual HRESULT STDMETHODCALLTYPE CreateStream(WCHAR const *, DWORD, DWORD, DWORD, IStream **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE OpenStream(WCHAR const *, void *, DWORD, DWORD, IStream **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE CreateStorage(WCHAR const *, DWORD, DWORD, DWORD, IStorage **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE OpenStorage(WCHAR const *, IStorage *, DWORD, SNB, DWORD, IStorage **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE CopyTo(DWORD, IID const *, SNB, IStorage *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE MoveElementTo(WCHAR const *, IStorage *, WCHAR const *, DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Commit(DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Revert(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE EnumElements(DWORD, void *, DWORD, IEnumSTATSTG **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE DestroyElement(WCHAR const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE RenameElement(WCHAR const *, WCHAR const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetElementTimes(WCHAR const *, FILETIME const *, FILETIME const *, FILETIME const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetClass(REFCLSID) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetStateBits(DWORD, DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Stat(STATSTG *, DWORD) = 0;
-};
-
-struct DECLSPEC_UUID("00000138-0000-0000-C000-000000000046") IPropertyStorage : IUnknown {
-	virtual HRESULT STDMETHODCALLTYPE ReadMultiple(ULONG, PROPSPEC const *, PROPVARIANT *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE WriteMultiple(ULONG, PROPSPEC const *, PROPVARIANT const *, PROPID) = 0;
-	virtual HRESULT STDMETHODCALLTYPE DeleteMultiple(ULONG, PROPSPEC const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE ReadPropertyNames(ULONG, PROPID const *, LPOLESTR *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE WritePropertyNames(ULONG, PROPID const *, LPOLESTR const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE DeletePropertyNames(ULONG, PROPID const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Commit(DWORD) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Revert(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Enum(IEnumSTATPROPSTG **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetTimes(FILETIME const *, FILETIME const *, FILETIME const *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE SetClass(REFCLSID) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Stat(STATPROPSETSTG *) = 0;
-};
-
-struct DECLSPEC_UUID("0000013A-0000-0000-C000-000000000046") IPropertySetStorage : IUnknown {
-	virtual HRESULT STDMETHODCALLTYPE Create(REFFMTID, CLSID const *, DWORD, DWORD, IPropertyStorage **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Open(REFFMTID, DWORD, IPropertyStorage **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Delete(REFFMTID) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Enum(IEnumSTATPROPSETSTG **) = 0;
-};
-
-struct DECLSPEC_UUID("0000010C-0000-0000-C000-000000000046") IPersist : IUnknown {
-	virtual HRESULT STDMETHODCALLTYPE GetClassID(CLSID *) = 0;
-};
-
-struct DECLSPEC_UUID("00000109-0000-0000-C000-000000000046") IPersistStream : IPersist {
-	virtual HRESULT STDMETHODCALLTYPE IsDirty(void) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Load(IStream *) = 0;
-	virtual HRESULT STDMETHODCALLTYPE Save(IStream *, BOOL) = 0;
-	virtual HRESULT STDMETHODCALLTYPE GetSizeMax(ULARGE_INTEGER *) = 0;
-};
-
-struct DECLSPEC_UUID("00000001-0000-0000-C000-000000000046") IClassFactory : IUnknown {
-	virtual HRESULT STDMETHODCALLTYPE CreateInstance(IUnknown *, REFIID, void **) = 0;
-	virtual HRESULT STDMETHODCALLTYPE LockServer(BOOL) = 0;
-};
-
-HRESULT CoCreateInstance(REFCLSID class_id, IUnknown * outer, DWORD context, REFIID interface_id, void ** object);
-HRESULT CoRegisterClassObject(REFCLSID class_id, IUnknown * factory, DWORD context, DWORD flags, DWORD * registration);
-HRESULT CoRevokeClassObject(DWORD registration);
-
-template<class Interface, GUID const * Identifier>
-struct _com_IIID {
-	using InterfaceType = Interface;
-	static constexpr GUID const * InterfaceIdentifier = Identifier;
-};
-
-template<class Descriptor>
-class _com_ptr_t
-{
-	public:
-		using Interface = typename Descriptor::InterfaceType;
-		_com_ptr_t(void) : Pointer(nullptr) {}
-		_com_ptr_t(Interface * pointer, bool addref = true) : Pointer(pointer) { if (Pointer && addref) Pointer->AddRef(); }
-		template<class Other>
-		_com_ptr_t(Other * source) : Pointer(nullptr)
-		{
-			if (source) source->QueryInterface(*Descriptor::InterfaceIdentifier, reinterpret_cast<void **>(&Pointer));
-		}
-		_com_ptr_t(REFCLSID class_id, IUnknown * outer = nullptr, DWORD context = 0) : Pointer(nullptr)
-		{
-			CreateInstance(class_id, outer, context);
-		}
-		_com_ptr_t(_com_ptr_t const & that) : Pointer(that.Pointer) { if (Pointer) Pointer->AddRef(); }
-		template<class OtherDescriptor>
-		_com_ptr_t(_com_ptr_t<OtherDescriptor> const & that) : Pointer(nullptr)
-		{
-			IUnknown * source = that.GetInterface();
-			if (source) source->QueryInterface(*Descriptor::InterfaceIdentifier, reinterpret_cast<void **>(&Pointer));
-		}
-		~_com_ptr_t(void) { Release(); }
-		_com_ptr_t & operator=(_com_ptr_t const & that) { if (this != &that) Attach(that.Pointer); return(*this); }
-		template<class OtherDescriptor>
-		_com_ptr_t & operator=(_com_ptr_t<OtherDescriptor> const & that)
-		{
-			Release();
-			IUnknown * source = that.GetInterface();
-			if (source) source->QueryInterface(*Descriptor::InterfaceIdentifier, reinterpret_cast<void **>(&Pointer));
-			return(*this);
-		}
-		Interface * operator->(void) const { return(Pointer); }
-		operator Interface *(void) const { return(Pointer); }
-		Interface * GetInterface(void) const { return(Pointer); }
-		Interface ** operator&(void) { Release(); return(&Pointer); }
-		void Attach(Interface * pointer, bool addref = true) { Release(); Pointer = pointer; if (Pointer && addref) Pointer->AddRef(); }
-		Interface * Detach(void) { Interface * result = Pointer; Pointer = nullptr; return(result); }
-		void Release(void) { if (Pointer) { Interface * old = Pointer; Pointer = nullptr; old->Release(); } }
-		HRESULT CreateInstance(REFCLSID class_id, IUnknown * outer = nullptr, DWORD context = 0)
-		{
-			Release();
-			return(CoCreateInstance(class_id, outer, context, *Descriptor::InterfaceIdentifier,
-				reinterpret_cast<void **>(&Pointer)));
-		}
-	private:
-		Interface * Pointer;
-};
-
-#define _COM_SMARTPTR_TYPEDEF(Interface, iid) \
-	typedef _com_ptr_t<_com_IIID<Interface, &iid>> Interface##Ptr
-
-_COM_SMARTPTR_TYPEDEF(IUnknown, IID_IUnknown);
-_COM_SMARTPTR_TYPEDEF(IStream, IID_IStream);
-_COM_SMARTPTR_TYPEDEF(IStorage, IID_IStorage);
-_COM_SMARTPTR_TYPEDEF(IPersist, IID_IPersist);
-_COM_SMARTPTR_TYPEDEF(IPersistStream, IID_IPersistStream);
-_COM_SMARTPTR_TYPEDEF(IPropertyStorage, IID_IPropertyStorage);
-_COM_SMARTPTR_TYPEDEF(IPropertySetStorage, IID_IPropertySetStorage);
-
-using LPPERSISTSTREAM = IPersistStream *;
-
-HRESULT StgCreateDocfile(WCHAR const * path, DWORD mode, DWORD reserved, IStorage ** storage);
-HRESULT StgOpenStorage(WCHAR const * path, IStorage * priority, DWORD mode, SNB exclude, DWORD reserved,
-	IStorage ** storage);
-HRESULT PropVariantClear(PROPVARIANT * value);
-HRESULT CoFileTimeNow(FILETIME * time);
-
-inline void _com_issue_error(HRESULT result)
-{
-	throw std::runtime_error("COM operation failed: " + std::to_string(result));
-}
-
-inline HRESULT OleSaveToStream(IPersistStream * persistent, IStream * stream)
-{
-	if (!persistent || !stream) return(E_POINTER);
-	CLSID class_id = {};
-	HRESULT result = persistent->GetClassID(&class_id);
-	if (FAILED(result)) return(result);
-	ULONG written = 0;
-	result = stream->Write(&class_id, sizeof(class_id), &written);
-	if (FAILED(result) || written != sizeof(class_id)) return(FAILED(result) ? result : E_FAIL);
-	return(persistent->Save(stream, TRUE));
-}
-
-inline HRESULT OleLoadFromStream(IStream * stream, REFIID interface_id, void ** object)
-{
-	if (!stream || !object) return(E_POINTER);
-	*object = nullptr;
-	CLSID class_id = {};
-	ULONG read = 0;
-	HRESULT result = stream->Read(&class_id, sizeof(class_id), &read);
-	if (FAILED(result) || read != sizeof(class_id)) return(FAILED(result) ? result : E_FAIL);
-	IPersistStream * persistent = nullptr;
-	result = CoCreateInstance(class_id, nullptr, 0, IID_IPersistStream, reinterpret_cast<void **>(&persistent));
-	if (FAILED(result)) return(result);
-	result = persistent->Load(stream);
-	if (SUCCEEDED(result)) result = persistent->QueryInterface(interface_id, object);
-	persistent->Release();
-	return(result);
-}
 
 struct CRITICAL_SECTION { std::recursive_mutex Mutex; };
 inline void InitializeCriticalSection(CRITICAL_SECTION *) {}
@@ -1882,7 +1653,9 @@ inline char * strupr(char * text) { for (char * p = text; *p; p++) *p = static_c
 #ifndef _strupr
 inline char * _strupr(char * text) { return(strupr(text)); }
 #endif
+#ifndef _strlwr
 inline char * _strlwr(char * text) { for (char * p = text; *p; p++) *p = static_cast<char>(std::tolower(*p)); return(text); }
+#endif
 #ifndef strrev
 inline char * strrev(char * text) { std::reverse(text, text + std::strlen(text)); return(text); }
 #endif
@@ -2091,35 +1864,6 @@ inline BOOL CharToOemBuff(char const * source, char * destination, DWORD length)
 	return(succeeded ? TRUE : FALSE);
 }
 
-inline HRESULT CLSIDFromString(wchar_t const * text, CLSID * identifier)
-{
-	if (!text || !identifier) return(E_INVALIDARG);
-	unsigned data[11] = {};
-	int const fields = swscanf(text, L"{%8x-%4x-%4x-%2x%2x-%2x%2x%2x%2x%2x%2x}",
-		&data[0], &data[1], &data[2], &data[3], &data[4], &data[5], &data[6],
-		&data[7], &data[8], &data[9], &data[10]);
-	if (fields != 11) return(E_INVALIDARG);
-	identifier->Data1 = data[0];
-	identifier->Data2 = static_cast<std::uint16_t>(data[1]);
-	identifier->Data3 = static_cast<std::uint16_t>(data[2]);
-	for (int index = 0; index < 8; ++index) identifier->Data4[index] = static_cast<std::uint8_t>(data[index + 3]);
-	return(S_OK);
-}
-
-inline HRESULT StringFromCLSID(REFCLSID identifier, LPOLESTR * text)
-{
-	if (!text) return(E_POINTER);
-	*text = static_cast<wchar_t *>(malloc(39 * sizeof(wchar_t)));
-	if (!*text) return(E_OUTOFMEMORY);
-	swprintf(*text, 39, L"{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
-		identifier.Data1, identifier.Data2, identifier.Data3,
-		identifier.Data4[0], identifier.Data4[1], identifier.Data4[2], identifier.Data4[3],
-		identifier.Data4[4], identifier.Data4[5], identifier.Data4[6], identifier.Data4[7]);
-	return(S_OK);
-}
-
-inline void CoTaskMemFree(void * memory) { free(memory); }
-inline void SysFreeString(wchar_t * string) { free(string); }
 inline void * LocalFree(void * memory) { free(memory); return(nullptr); }
 
 inline wchar_t const * GetCommandLineW()
@@ -2446,184 +2190,3 @@ inline BOOL FindClose(HANDLE handle)
 	return(TRUE);
 }
 
-constexpr DWORD STREAM_SEEK_SET = SEEK_SET;
-constexpr DWORD STREAM_SEEK_CUR = SEEK_CUR;
-constexpr DWORD STREAM_SEEK_END = SEEK_END;
-constexpr DWORD STGM_READ = 0;
-constexpr DWORD STGM_WRITE = 1;
-constexpr DWORD STGM_READWRITE = 2;
-constexpr DWORD STGM_CREATE = 0x1000;
-constexpr DWORD CLSCTX_ALL = 0;
-constexpr DWORD CLSCTX_INPROC_SERVER = 1;
-constexpr DWORD CLSCTX_INPROC_HANDLER = 2;
-constexpr DWORD CLSCTX_LOCAL_SERVER = 4;
-constexpr DWORD REGCLS_MULTIPLEUSE = 1;
-
-namespace OpenTSMacOS
-{
-	struct ClassRegistration
-	{
-		DWORD Identifier;
-		GUID ClassIdentifier;
-		IClassFactory * Factory;
-	};
-
-	inline std::mutex ClassRegistryMutex;
-	inline std::vector<ClassRegistration> ClassRegistry;
-	inline std::atomic<DWORD> NextClassRegistration {1};
-}
-
-inline HRESULT CoRegisterClassObject(REFCLSID class_id, IUnknown * factory, DWORD, DWORD, DWORD * registration)
-{
-	if (!factory || !registration) return(E_POINTER);
-	IClassFactory * class_factory = nullptr;
-	HRESULT const result = factory->QueryInterface(IID_IClassFactory, reinterpret_cast<void **>(&class_factory));
-	if (FAILED(result)) return(result);
-
-	DWORD const identifier = OpenTSMacOS::NextClassRegistration.fetch_add(1);
-	std::lock_guard lock(OpenTSMacOS::ClassRegistryMutex);
-	OpenTSMacOS::ClassRegistry.push_back({identifier, class_id, class_factory});
-	*registration = identifier;
-	return(S_OK);
-}
-
-inline HRESULT CoRevokeClassObject(DWORD registration)
-{
-	std::lock_guard lock(OpenTSMacOS::ClassRegistryMutex);
-	auto const entry = std::find_if(OpenTSMacOS::ClassRegistry.begin(), OpenTSMacOS::ClassRegistry.end(),
-		[registration](auto const & candidate) { return(candidate.Identifier == registration); });
-	if (entry == OpenTSMacOS::ClassRegistry.end()) return(E_FAIL);
-	entry->Factory->Release();
-	OpenTSMacOS::ClassRegistry.erase(entry);
-	return(S_OK);
-}
-
-inline HRESULT CoCreateInstance(REFCLSID class_id, IUnknown * outer, DWORD, REFIID interface_id, void ** object)
-{
-	if (!object) return(E_POINTER);
-	*object = nullptr;
-	std::lock_guard lock(OpenTSMacOS::ClassRegistryMutex);
-	for (auto const & entry : OpenTSMacOS::ClassRegistry) {
-		if (entry.ClassIdentifier == class_id) return(entry.Factory->CreateInstance(outer, interface_id, object));
-	}
-	return(E_FAIL);
-}
-
-class MemoryStream final : public IStream
-{
-public:
-	MemoryStream() : References_(1), Position_(0) {}
-
-	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID identifier, void ** result) override
-	{
-		if (!result) return(E_POINTER);
-		*result = nullptr;
-		if (identifier == IID_IUnknown || identifier == IID_IStream || identifier == IID_ISequentialStream) {
-			*result = static_cast<IStream *>(this);
-		}
-		if (!*result) return(E_NOINTERFACE);
-		AddRef();
-		return(S_OK);
-	}
-
-	ULONG STDMETHODCALLTYPE AddRef(void) override { return(++References_); }
-	ULONG STDMETHODCALLTYPE Release(void) override
-	{
-		ULONG const count = --References_;
-		if (count == 0) delete this;
-		return(count);
-	}
-
-	HRESULT STDMETHODCALLTYPE Read(void * destination, ULONG count, ULONG * read) override
-	{
-		if (read) *read = 0;
-		if (!destination && count) return(STG_E_INVALIDPOINTER);
-		std::size_t const available = Position_ < Buffer_.size() ? Buffer_.size() - static_cast<std::size_t>(Position_) : 0;
-		std::size_t const amount = std::min<std::size_t>(count, available);
-		if (amount) std::memcpy(destination, Buffer_.data() + Position_, amount);
-		Position_ += amount;
-		if (read) *read = static_cast<ULONG>(amount);
-		return(amount == count ? S_OK : S_FALSE);
-	}
-
-	HRESULT STDMETHODCALLTYPE Write(void const * source, ULONG count, ULONG * written) override
-	{
-		if (written) *written = 0;
-		if (!source && count) return(STG_E_INVALIDPOINTER);
-		if (static_cast<std::size_t>(Position_ + count) > Buffer_.size()) {
-			Buffer_.resize(static_cast<std::size_t>(Position_ + count));
-		}
-		if (count) std::memcpy(Buffer_.data() + Position_, source, count);
-		Position_ += count;
-		if (written) *written = count;
-		return(S_OK);
-	}
-
-	HRESULT STDMETHODCALLTYPE Seek(LARGE_INTEGER move, DWORD origin, ULARGE_INTEGER * new_position) override
-	{
-		std::int64_t target = 0;
-		switch (origin) {
-			case STREAM_SEEK_SET: target = move.QuadPart; break;
-			case STREAM_SEEK_CUR: target = static_cast<std::int64_t>(Position_) + move.QuadPart; break;
-			case STREAM_SEEK_END: target = static_cast<std::int64_t>(Buffer_.size()) + move.QuadPart; break;
-			default: return(STG_E_INVALIDFUNCTION);
-		}
-		if (target < 0) return(STG_E_INVALIDFUNCTION);
-		Position_ = static_cast<std::uint64_t>(target);
-		if (new_position) new_position->QuadPart = Position_;
-		return(S_OK);
-	}
-
-	HRESULT STDMETHODCALLTYPE SetSize(ULARGE_INTEGER new_size) override
-	{
-		Buffer_.resize(static_cast<std::size_t>(new_size.QuadPart));
-		return(S_OK);
-	}
-
-	HRESULT STDMETHODCALLTYPE CopyTo(IStream * target, ULARGE_INTEGER count, ULARGE_INTEGER * read, ULARGE_INTEGER * written) override
-	{
-		if (!target) return(E_POINTER);
-		std::size_t const available = Position_ < Buffer_.size() ? Buffer_.size() - static_cast<std::size_t>(Position_) : 0;
-		std::size_t const amount = std::min<std::size_t>(static_cast<std::size_t>(count.QuadPart), available);
-		ULONG out_written = 0;
-		HRESULT const hr = target->Write(Buffer_.data() + Position_, static_cast<ULONG>(amount), &out_written);
-		Position_ += amount;
-		if (read) read->QuadPart = amount;
-		if (written) written->QuadPart = out_written;
-		return(hr);
-	}
-
-	HRESULT STDMETHODCALLTYPE Commit(DWORD) override { return(S_OK); }
-	HRESULT STDMETHODCALLTYPE Revert(void) override { return(S_OK); }
-	HRESULT STDMETHODCALLTYPE LockRegion(ULARGE_INTEGER, ULARGE_INTEGER, DWORD) override { return(STG_E_INVALIDFUNCTION); }
-	HRESULT STDMETHODCALLTYPE UnlockRegion(ULARGE_INTEGER, ULARGE_INTEGER, DWORD) override { return(STG_E_INVALIDFUNCTION); }
-	HRESULT STDMETHODCALLTYPE Stat(STATSTG * stat, DWORD) override
-	{
-		if (!stat) return(E_POINTER);
-		*stat = {};
-		stat->type = STGTY_STREAM;
-		stat->cbSize.QuadPart = Buffer_.size();
-		return(S_OK);
-	}
-	HRESULT STDMETHODCALLTYPE Clone(IStream ** clone) override
-	{
-		if (!clone) return(E_POINTER);
-		auto * copy = new MemoryStream();
-		copy->Buffer_ = Buffer_;
-		copy->Position_ = Position_;
-		*clone = copy;
-		return(S_OK);
-	}
-
-private:
-	std::atomic<ULONG> References_;
-	std::vector<std::uint8_t> Buffer_;
-	std::uint64_t Position_;
-};
-
-inline HRESULT CreateStreamOnHGlobal(HGLOBAL, BOOL, IStream ** stream)
-{
-	if (!stream) return(E_POINTER);
-	*stream = new MemoryStream();
-	return(S_OK);
-}

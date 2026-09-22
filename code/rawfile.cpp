@@ -195,6 +195,11 @@ char const * RawFileClass::Set_Name(char const * filename)
 	}
 
 #ifndef _WIN32
+	// The game builds paths with backslashes, which POSIX treats as part of a name.
+	for (char * scan = Filename; *scan != '\0'; ++scan) {
+		if (*scan == '\\') *scan = '/';
+	}
+
 	/*
 	** If we ever save this file, make sure we save it in lowercase but
 	** if Resolve_File finds an actual file on-disk we use the real name
