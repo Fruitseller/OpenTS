@@ -34,7 +34,7 @@ inventory is closed, and the save-format decision is documented and tested.
 
 | Boundary | Finding | Phase 1 treatment |
 | --- | --- | --- |
-| Save streams and swizzling | `CONTENTS` is written field by field, but it includes native-width pointer values used as swizzle IDs and other layout-sensitive members. The pointer width therefore changes the stream, even though COM storage itself is architecture-neutral. | Save headers now record the writer's pointer width. Load admission rejects a different width before reading `CONTENTS`. |
+| Save streams and swizzling | The game state is written field by field, and pointer members were written as native-width swizzle IDs. | Superseded upstream: the save container no longer uses COM storage, and swizzle identities travel as four bytes numbered in save order ([The saved game format](SAVE-FORMAT.md)). |
 | Network packets and replays | `EventClass` is a packed wire record and replays write the same record. | Its 46-byte legacy layout remains the contract. `NetContract` checks the size and the compressed and uncompressed decoders on both build architectures. |
 | TMP tile data | The tile table stores 32-bit offsets from the start of the file, not native pointers. Its records use the 52-byte Microsoft bitfield layout. | The in-memory view keeps table entries as `uint32_t`, resolves each offset when accessed, and preserves the record layout on Apple clang. |
 | Window procedures, timers, and VQA callbacks | Several Win32 callbacks and user-data slots carried pointers through `int`, `long`, or `DWORD`. | Callback signatures and storage use `INT_PTR`, `LONG_PTR`, `DWORD_PTR`, `WPARAM`, `LPARAM`, `intptr_t`, or `uintptr_t` as required by the API. |
@@ -44,40 +44,23 @@ inventory is closed, and the save-format decision is documented and tested.
 
 ### Phase 1 save-format decision
 
-Saves are architecture-specific. Save-header format version 2 adds a `Pointer
-Size` property. New Win32 saves record `4`; Windows x64 saves record `8`.
-Headers from format version 1 have no property and are treated as Win32 saves.
-The load dialog, direct load path, and spawner resume path require both the
-engine version and pointer width to match.
-
-This preserves existing Win32 saves on Win32 and prevents a 64-bit process
-from interpreting 32-bit object layouts or truncated swizzle IDs. Win32 and
-x64 saves do not load across architectures. There is no safe automatic
-converter because `CONTENTS` is an architecture-dependent member stream, not
-a portable versioned schema. Players migrating an existing campaign must
-finish it with a matching Win32 build; the x64 build starts a separate save
-history. A future cross-architecture format requires an explicit field schema
-and converter.
-
-`SaveCompat` pins the admission matrix without COM or game assets. `LCWRoundTrip`
-checks the x64 compressor fallback, and `VqaDecode` pins the 4×2 row layout of
-the x64 VQA decoder:
-
-| Reader | Legacy or version 2 Win32 save | Version 2 x64 save |
-| --- | --- | --- |
-| Win32 | Accept | Reject |
-| x64 | Reject | Accept |
+Phase 1 first recorded the writer's pointer width in the save header and
+refused saves from the other width. The upstream save container that replaced
+COM structured storage writes every swizzle identity as four bytes, so the
+game state no longer depends on pointer width, and that header field was
+dropped. [The saved game format](SAVE-FORMAT.md) owns the current layout.
+`LCWRoundTrip` checks the x64 compressor fallback, and `VqaDecode` pins the 4×2
+row layout of the x64 VQA decoder.
 
 ### Phase 1 proving configuration and status
 
-Visual Studio can configure the proving build with `-A x64`. The experimental
+Windows x64 has since become a supported upstream target. The experimental
 clang-cl toolchain accepts `-DOPENTS_WINDOWS_ARCH=x64`; x86 remains its
-default. [Building OpenTS](BUILDING.md#phase-1-x64-proving-build)
-contains the commands and validation boundary.
+default. [Building OpenTS](BUILDING.md) contains the commands.
 
 Phase 1 is complete. Debug and Release compile and link as x64 PEs with the
 clang-cl proving configuration. Strict pointer-cast diagnostics pass, and the
-native `SaveCompat`, `LCWRoundTrip`, and `VqaDecode` tests cover the portable
+native `LCWRoundTrip` and `VqaDecode` tests cover the portable
 logic without requiring Windows or proprietary game assets. These results are
 compile, link, and focused test evidence; they make no Windows runtime claim.
 
@@ -104,8 +87,6 @@ Move the remaining Windows dependencies behind a thin platform layer:
 - Audio: put `code/dsaudio.cpp` behind an audio interface and stop leaking
   DirectSound types through `code/sound.h` into gameplay code.
 - Networking: port `code/wspudp.cpp` to BSD sockets.
-- COM: a minimal `IUnknown`/`IStream` shim so save and load work without
-  Windows COM.
 - Strings: replace the `Language.dll` resource loading with a portable
   loader.
 - Video: presentation already goes through bgfx, which has a Metal backend;
@@ -120,8 +101,7 @@ Status: instead of rewriting callers onto new interfaces, the bring-up keeps
 the Win32 API surface and supplies a compatibility layer under
 `code/platform/macos`: an AppKit window, message queue, and input path; an
 AudioQueue backend behind the DirectSound interface; BSD sockets behind the
-winsock header; a COM `IStorage`/`IStream` implementation for saves
-(`MacOSStorage`); and a PE resource reader for `Language.dll` strings and
+winsock header; and a PE resource reader for `Language.dll` strings and
 dialogs (`PEResource`). Whether the thin-interface extraction still happens
 per subsystem remains open; the compatibility layer is the current working
 boundary. The Windows configurations have not been re-verified against this

@@ -97,8 +97,18 @@ inline char * OpenTS_strrev(char * text)
 #ifndef strupr
 #define strupr OpenTS_strupr
 #endif
+inline char * OpenTS_strlwr(char * text)
+{
+	for (char * current = text; *current; ++current) {
+		*current = static_cast<char>(std::tolower(static_cast<unsigned char>(*current)));
+	}
+	return(text);
+}
 #ifndef strrev
 #define strrev OpenTS_strrev
+#endif
+#ifndef _strlwr
+#define _strlwr OpenTS_strlwr
 #endif
 #ifndef MAX_PATH
 #define MAX_PATH 1024
@@ -118,25 +128,6 @@ inline char * OpenTS_strrev(char * text)
 #ifndef _MAX_EXT
 #define _MAX_EXT 256
 #endif
-inline void _makepath(char * path, char const *, char const * directory, char const * filename, char const * extension)
-{
-	char const * dot = extension && *extension && *extension != '.' ? "." : "";
-	std::snprintf(path, _MAX_PATH, "%s%s%s%s", directory ? directory : "", filename ? filename : "",
-		dot, extension && *extension ? extension : "");
-}
-inline void _splitpath(char const * path, char * drive, char * directory, char * filename, char * extension)
-{
-	if (drive) drive[0] = '\0';
-	// Windows _splitpath accepts both separators, and the game builds paths with backslashes.
-	char const * slash = std::strrchr(path, '/');
-	char const * backslash = std::strrchr(path, '\\');
-	if (backslash && (!slash || backslash > slash)) slash = backslash;
-	char const * base = slash ? slash + 1 : path;
-	char const * dot = std::strrchr(base, '.');
-	if (directory) { std::size_t length = slash ? static_cast<std::size_t>(slash - path + 1) : 0; std::memcpy(directory, path, length); directory[length] = '\0'; }
-	if (filename) { std::size_t length = dot ? static_cast<std::size_t>(dot - base) : std::strlen(base); std::memcpy(filename, base, length); filename[length] = '\0'; }
-	if (extension) std::strcpy(extension, dot ? dot : "");
-}
 #endif
 
 
@@ -176,25 +167,6 @@ inline void _splitpath(char const * path, char * drive, char * directory, char *
 ** Define some Windows specific values that are used throghout the games
 */
 #ifndef _WIN32
-
-#define _MAX_DRIVE 3
-#define _MAX_DIR   256
-#define _MAX_FNAME 256
-#define _MAX_EXT   256
-#define _MAX_PATH  512
-#define MAX_PATH   _MAX_PATH
-#define _CONTROL   0x20  // space, first non-control character in ASCII
-
-#undef _stricmp
-#define stricmp  strcasecmp
-#define _stricmp strcasecmp
-#define strnicmp strncasecmp
-#define memicmp  strncasecmp
-#define __cdecl
-
-#include <cctype>
-#include <cstdio>
-#include <cstring>
 
 inline void _makepath(char * path, char const * drive, char const * dir, char const * fname, char const * ext)
 {
@@ -270,35 +242,6 @@ inline void _splitpath(char const * path, char * drive, char * dir, char * fname
 
 	if (fname != nullptr) snprintf(fname, _MAX_FNAME, "%.*s", (int)(dot - name), name);
 	if (ext != nullptr) snprintf(ext, _MAX_EXT, "%s", dot);
-}
-
-inline static char* strupr(char* str)
-{
-	char* ret = str;
-	while (*str != '\0') {
-		*str = toupper(*str);
-		++str;
-	}
-	return(ret);
-}
-
-inline static void strrev(char* str)
-{
-	int len = strlen(str);
-
-	for (int i = 0; i < len / 2; i++) {
-		char c = str[i];
-		str[i] = str[len - i - 1];
-		str[len - i - 1] = c;
-	}
-}
-
-inline static void _strlwr(char* str)
-{
-	while (*str != '\0') {
-		*str = tolower(*str);
-		++str;
-	}
 }
 
 #endif // not _WIN32
