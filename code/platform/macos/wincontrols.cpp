@@ -1215,8 +1215,8 @@ BOOL SetWindowPos(HWND window, HWND insert_after, int x, int y, int width, int h
 		}
 	}
 
-	if (!(flags & SWP_NOREDRAW)) {
-		RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+	if (!(flags & SWP_NOREDRAW) && control->Visible) {
+		RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
 	}
 	return(TRUE);
 }
@@ -1336,6 +1336,7 @@ BOOL RedrawWindow(HWND window, RECT const * rectangle, HANDLE, UINT flags)
 {
 	if (!window) return(FALSE);
 	if (OpenTSMacOS_Is_Control_Window(window)) {
+		if (!IsWindowVisible(window)) return(TRUE);
 		if (flags & RDW_INVALIDATE) OpenTSMacOS_Invalidate_Control(window);
 		if (flags & RDW_UPDATENOW) {
 			if (GetUpdateRect(window, nullptr, FALSE)) SendMessage(window, WM_PAINT, 0, 0);
