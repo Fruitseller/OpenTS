@@ -474,6 +474,31 @@ static void OpenTSMacOS_Request_Quit(void)
 	Queue_Message((__bridge HWND)notification.object, MessageDestroy);
 }
 
+- (void)applicationDidBecomeActive:(NSNotification *)notification
+{
+	if (MainNativeWindow != nil && !MainNativeWindow.keyWindow) {
+		[MainNativeWindow makeKeyAndOrderFront:nil];
+		if (!MainNativeWindow.keyWindow) {
+			NSNotification * key_notification = [NSNotification
+				notificationWithName:NSWindowDidBecomeKeyNotification object:MainNativeWindow];
+			[self windowDidBecomeKey:key_notification];
+		}
+	}
+}
+
+- (CocoaBOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(CocoaBOOL)flag
+{
+	if (MainNativeWindow != nil && !MainNativeWindow.keyWindow) {
+		[MainNativeWindow makeKeyAndOrderFront:nil];
+		if (!MainNativeWindow.keyWindow) {
+			NSNotification * key_notification = [NSNotification
+				notificationWithName:NSWindowDidBecomeKeyNotification object:MainNativeWindow];
+			[self windowDidBecomeKey:key_notification];
+		}
+	}
+	return(YES);
+}
+
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {
 	OpenTSMacOS_Request_Quit();
@@ -1263,11 +1288,26 @@ bool OpenTSMacOS_Test_Text_Input(void)
 bool OpenTSMacOS_Test_Focus_Activation(void)
 {
 	InitialActivationDone = false;
+	MessageQueue.clear();
+	NSRect const frame = NSMakeRect(0.0, 0.0, 32.0, 32.0);
+	OpenTSWindow * window = [[OpenTSWindow alloc] initWithContentRect:frame
+		styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
+	MainNativeWindow = window;
 	OpenTSWindowDelegate * delegate = [[OpenTSWindowDelegate alloc] init];
 	NSNotification * notification = [NSNotification notificationWithName:@"OpenTSFocusTest"
-		object:nil];
+		object:window];
 	[delegate windowDidBecomeKey:notification];
-	return(InitialActivationDone);
+	if (!InitialActivationDone) {
+		MainNativeWindow = nil;
+		return(false);
+	}
+	[delegate windowDidResignKey:notification];
+	[delegate applicationDidBecomeActive:notification];
+	bool const reactivated = (MessageQueue.size() >= 3
+		&& MessageQueue.back().message == MessageActivateApplication
+		&& MessageQueue.back().wParam == TRUE);
+	MainNativeWindow = nil;
+	return(reactivated);
 }
 
 bool OpenTSMacOS_Test_Fullscreen_Window_Level(void)
