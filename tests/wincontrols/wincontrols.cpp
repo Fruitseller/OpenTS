@@ -317,10 +317,15 @@ namespace
 		static inline int LastDrawItemAction = -1;
 		static inline int LastCommandCheckState = -1;
 		static inline HWND DependentCheckbox = nullptr;
+		static inline int PaintCount = 0;
 	};
 
 	INT_PTR CALLBACK Recording_Dlg_Proc(HWND, UINT message, WPARAM wparam, LPARAM lparam)
 	{
+		if (message == WM_PAINT) {
+			DialogProcRecorder::PaintCount++;
+			return(TRUE);
+		}
 		if (message == WM_COMMAND) {
 			DialogProcRecorder::LastCommandId = LOWORD(wparam);
 			DialogProcRecorder::CommandCount++;
@@ -451,6 +456,22 @@ namespace
 		// Child window destruction and parent invalidation
 		HWND const child_win = CreateWindowEx(0, "Button", "Child", WS_VISIBLE, 5, 5, 20, 20, combo, nullptr, nullptr, nullptr);
 		Check(DestroyWindow(child_win), "DestroyWindow on child window succeeds");
+
+		// Hidden window redrawing
+		HWND const hidden_dialog = CreateDialogParam(nullptr, MAKEINTRESOURCE(198), nullptr, Recording_Dlg_Proc, 0);
+		ShowWindow(hidden_dialog, SW_HIDE);
+		DialogProcRecorder::PaintCount = 0;
+		SetWindowPos(hidden_dialog, nullptr, 0, 0, 100, 100, 0);
+		RedrawWindow(hidden_dialog, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+		Check(DialogProcRecorder::PaintCount == 0, "hidden dialog does not receive WM_PAINT on redraw or move");
+
+		DialogProcRecorder::PaintCount = 0;
+		ShowWindow(hidden_dialog, SW_SHOW);
+		Check(DialogProcRecorder::PaintCount == 1, "showing dialog triggers a redraw");
+		DialogProcRecorder::PaintCount = 0;
+		RedrawWindow(hidden_dialog, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+		Check(DialogProcRecorder::PaintCount == 1, "visible dialog receives WM_PAINT on RDW_UPDATENOW");
+		DestroyWindow(hidden_dialog);
 
 		DestroyWindow(dialog);
 	}
