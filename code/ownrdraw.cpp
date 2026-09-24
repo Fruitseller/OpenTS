@@ -6572,6 +6572,9 @@ void OwnerDraw::Draw_Dialog_Back(HWND window)
 	if (ODWinData.getEntries() != 0) {
 		ODWinData.getPointer(window, &entry);
 	}
+	if (entry == nullptr) {
+		return;
+	}
 
 	/*
 	 * Compute client rect and display rect; expand to max of each dimension.
