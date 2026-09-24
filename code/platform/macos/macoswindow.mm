@@ -71,6 +71,7 @@ namespace
 	bool ClosingWindow = false;
 	bool InitialActivationDone = false;
 	bool QuitRequested = false;
+	bool WindowedMode = false;
 
 	NSCursor * Get_Hidden_Cursor(void)
 	{
@@ -426,19 +427,32 @@ static void OpenTSMacOS_Request_Quit(void)
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
 	InitialActivationDone = true;
-	Queue_Message((__bridge HWND)notification.object, MessageActivateApplication, TRUE);
+	if (!WindowedMode) {
+		NSApplication.sharedApplication.presentationOptions =
+			NSApplicationPresentationAutoHideMenuBar | NSApplicationPresentationAutoHideDock;
+	}
+	if (notification.object != nil) {
+		Queue_Message((__bridge HWND)notification.object, MessageActivateApplication, TRUE);
+	}
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
+	if (!WindowedMode) {
+		NSApplication.sharedApplication.presentationOptions = NSApplicationPresentationDefault;
+	}
 	for (std::size_t key = 0; key < KeyState.size(); ++key) {
 		if (KeyState[key]) {
 			KeyState[key] = false;
-			Queue_Message((__bridge HWND)notification.object, MessageKeyUp, key,
-				static_cast<LPARAM>(1u << 30));
+			if (notification.object != nil) {
+				Queue_Message((__bridge HWND)notification.object, MessageKeyUp, key,
+					static_cast<LPARAM>(1u << 30));
+			}
 		}
 	}
-	Queue_Message((__bridge HWND)notification.object, MessageActivateApplication, FALSE);
+	if (notification.object != nil) {
+		Queue_Message((__bridge HWND)notification.object, MessageActivateApplication, FALSE);
+	}
 }
 
 - (CocoaBOOL)windowShouldClose:(NSWindow *)window
@@ -482,8 +496,10 @@ static OpenTSWindowDelegate * WindowDelegate = nil;
 
 static void Configure_Window_Mode(NSWindow * window, bool windowed)
 {
+	WindowedMode = windowed;
 	if (windowed) {
 		[window center];
+		NSApplication.sharedApplication.presentationOptions = NSApplicationPresentationDefault;
 	} else {
 		window.collectionBehavior = NSWindowCollectionBehaviorFullScreenPrimary;
 		window.level = NSNormalWindowLevel;
@@ -526,6 +542,10 @@ HWND OpenTSMacOS_Create_Window(int width, int height, bool windowed)
 		application.delegate = WindowDelegate;
 
 		Configure_Window_Mode(MainNativeWindow, windowed);
+		if (!windowed) {
+			application.presentationOptions =
+				NSApplicationPresentationAutoHideMenuBar | NSApplicationPresentationAutoHideDock;
+		}
 
 		Queue_Message((__bridge HWND)MainNativeWindow, MessageCreate);
 		[MainNativeWindow makeKeyAndOrderFront:nil];
@@ -548,6 +568,7 @@ void OpenTSMacOS_Destroy_Window(HWND window)
 		if (native_window == MainNativeWindow) {
 			MainNativeWindow = nil;
 			WindowDelegate = nil;
+			NSApplication.sharedApplication.presentationOptions = NSApplicationPresentationDefault;
 		}
 	}
 }
@@ -1256,6 +1277,33 @@ bool OpenTSMacOS_Test_Fullscreen_Window_Level(void)
 		styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
 	Configure_Window_Mode(window, false);
 	return(window.level == NSNormalWindowLevel);
+}
+
+bool OpenTSMacOS_Test_Fullscreen_Presentation(void)
+{
+	NSRect const frame = NSMakeRect(0.0, 0.0, 32.0, 32.0);
+	OpenTSWindow * window = [[OpenTSWindow alloc] initWithContentRect:frame
+		styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
+	Configure_Window_Mode(window, false);
+	OpenTSWindowDelegate * delegate = [[OpenTSWindowDelegate alloc] init];
+	NSNotification * notification = [NSNotification notificationWithName:@"OpenTSFocusTest"
+		object:nil];
+	[delegate windowDidBecomeKey:notification];
+	NSApplicationPresentationOptions const fullscreen_options =
+		NSApplicationPresentationAutoHideMenuBar | NSApplicationPresentationAutoHideDock;
+	if (NSApplication.sharedApplication.presentationOptions != fullscreen_options) {
+		return(false);
+	}
+	[delegate windowDidResignKey:notification];
+	if (NSApplication.sharedApplication.presentationOptions != NSApplicationPresentationDefault) {
+		return(false);
+	}
+	Configure_Window_Mode(window, true);
+	[delegate windowDidBecomeKey:notification];
+	bool const windowed_ok =
+		(NSApplication.sharedApplication.presentationOptions == NSApplicationPresentationDefault);
+	[delegate windowDidResignKey:notification];
+	return(windowed_ok);
 }
 
 bool OpenTSMacOS_Test_Request_Quit(void)

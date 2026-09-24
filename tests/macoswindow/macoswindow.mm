@@ -14,6 +14,7 @@
 
 bool OpenTSMacOS_Test_Focus_Activation(void);
 bool OpenTSMacOS_Test_Fullscreen_Window_Level(void);
+bool OpenTSMacOS_Test_Fullscreen_Presentation(void);
 bool OpenTSMacOS_Test_Request_Quit(void);
 bool OpenTSMacOS_Test_Command_Q(void);
 bool OpenTSMacOS_Test_Text_Input(void);
@@ -70,6 +71,10 @@ int main(int argc, char ** argv)
 
 	if (std::strcmp(argv[1], "fullscreen-level") == 0) {
 		return(OpenTSMacOS_Test_Fullscreen_Window_Level() ? 0 : 1);
+	}
+
+	if (std::strcmp(argv[1], "fullscreen-presentation") == 0) {
+		return(OpenTSMacOS_Test_Fullscreen_Presentation() ? 0 : 1);
 	}
 
 	if (std::strcmp(argv[1], "command-q") == 0) {
