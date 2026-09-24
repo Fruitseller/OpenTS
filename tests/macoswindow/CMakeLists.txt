@@ -21,6 +21,7 @@ set_target_properties(MacOSWindow PROPERTIES
 
 add_test(NAME macoswindow-focus COMMAND MacOSWindow focus)
 add_test(NAME macoswindow-fullscreen-level COMMAND MacOSWindow fullscreen-level)
+add_test(NAME macoswindow-fullscreen-presentation COMMAND MacOSWindow fullscreen-presentation)
 add_test(NAME macoswindow-quit COMMAND MacOSWindow quit)
 add_test(NAME macoswindow-command-q COMMAND MacOSWindow command-q)
 
