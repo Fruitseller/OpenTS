@@ -27,13 +27,18 @@
 #include "session.h"
 #include "win.h"
 
+#if defined(OPENTS_MACOS)
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
+#endif
+
 
 static uintptr_t ModuleBase = 0;
 static uint32_t ModuleSize = 0;
 static uint32_t MapImageBase = 0;
 
 
-static uint32_t Sync_Caller_RVA(unsigned caller)
+static uint32_t Sync_Caller_RVA(uintptr_t caller)
 {
 	uintptr_t const address = caller;
 	if (ModuleBase != 0 && address >= ModuleBase && address < ModuleBase + ModuleSize) {
@@ -137,7 +142,7 @@ static char const * Sync_Describe_Caller(uint32_t rva)
 }
 
 
-void Sync_Record_Random_Impl(Random2Class const & gen, int value, int minval, int maxval, bool ranged, unsigned caller)
+void Sync_Record_Random_Impl(Random2Class const & gen, int value, int minval, int maxval, bool ranged, uintptr_t caller)
 {
 	SyncRandomEntryType entry {};
 	entry.Frame = Frame;
@@ -153,7 +158,7 @@ void Sync_Record_Random_Impl(Random2Class const & gen, int value, int minval, in
 }
 
 
-void Sync_Record_Facing_Impl(DirType const & facing, unsigned caller)
+void Sync_Record_Facing_Impl(DirType const & facing, uintptr_t caller)
 {
 	SyncFacingEntryType entry {};
 	entry.Frame = Frame;
@@ -164,7 +169,7 @@ void Sync_Record_Facing_Impl(DirType const & facing, unsigned caller)
 }
 
 
-void Sync_Record_Target_Impl(AbstractClass const & subject, AbstractClass const * target, unsigned caller)
+void Sync_Record_Target_Impl(AbstractClass const & subject, AbstractClass const * target, uintptr_t caller)
 {
 	SyncTargetEntryType entry {};
 	entry.Frame = Frame;
@@ -177,7 +182,7 @@ void Sync_Record_Target_Impl(AbstractClass const & subject, AbstractClass const 
 }
 
 
-void Sync_Record_Mission_Impl(ObjectClass const & subject, int before, int after, int kind, unsigned caller)
+void Sync_Record_Mission_Impl(ObjectClass const & subject, int before, int after, int kind, uintptr_t caller)
 {
 	SyncMissionEntryType entry {};
 	entry.Frame = Frame;
@@ -191,7 +196,7 @@ void Sync_Record_Mission_Impl(ObjectClass const & subject, int before, int after
 }
 
 
-void Sync_Record_Anim_Impl(AnimClass const & anim, Coord const & coord, unsigned caller)
+void Sync_Record_Anim_Impl(AnimClass const & anim, Coord const & coord, uintptr_t caller)
 {
 	SyncAnimEntryType entry {};
 	entry.Frame = Frame;
@@ -265,6 +270,15 @@ void Sync_Recorder_Arm(void)
 	}
 
 	MapImageBase = Sync_Preferred_Image_Base();
+#elif defined(OPENTS_MACOS)
+	// The executable's code starts at its Mach-O header, so offsets from it match across machines
+	// running the same build despite address randomization.
+	mach_header_64 const * const header = (mach_header_64 const *)_dyld_get_image_header(0);
+	unsigned long text_size = 0;
+	ModuleBase = (uintptr_t)header;
+	ModuleSize = (header != nullptr && getsegmentdata(header, "__TEXT", &text_size) != nullptr)
+		? (uint32_t)text_size : 0;
+	MapImageBase = 0;
 #else
 	ModuleBase = 0;
 	ModuleSize = 0;
