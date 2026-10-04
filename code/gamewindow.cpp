@@ -241,7 +241,9 @@ void Game_Window_Handle_Event(WindowEvent const & event)
 /// <returns>False when SDL could not start or the window could not be created.</returns>
 bool Game_Window_Open(int width, int height)
 {
+#ifdef _WIN32
 	InitCommonControls();
+#endif
 
 	int clientwidth = width;
 	int clientheight = height;

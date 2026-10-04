@@ -97,15 +97,14 @@ Exit: platform-dependent callers use the new interfaces, portable backends
 cover each interface, and the Windows configurations still compile against
 them.
 
-Status: instead of rewriting callers onto new interfaces, the bring-up keeps
-the Win32 API surface and supplies a compatibility layer under
-`code/platform/macos`: an AppKit window, message queue, and input path; an
-AudioQueue backend behind the DirectSound interface; BSD sockets behind the
-winsock header; and a PE resource reader for `Language.dll` strings and
-dialogs (`PEResource`). Whether the thin-interface extraction still happens
-per subsystem remains open; the compatibility layer is the current working
-boundary. The Windows configurations have not been re-verified against this
-state.
+Status: upstream moved the window, input, and cursor to SDL3 and the dialogs to
+RmlUi documents, so macOS uses those layers directly. For the remaining Win32
+API surface, the bring-up supplies a compatibility layer under
+`code/platform/macos`: an AudioQueue backend behind the DirectSound interface,
+BSD sockets behind the winsock header, file and path functions, and a PE
+resource reader for `Language.dll` strings (`PEResource`). Whether the
+thin-interface extraction still happens per subsystem remains open. The Windows
+configurations have not been re-verified against this state.
 
 ## Phase 4 — Non-MSVC toolchain
 
@@ -140,32 +139,13 @@ uppercased a string literal in place. The macOS window now accepts key
 status so the game receives its first focus event, and the main menu responds
 to real mouse and keyboard input.
 
-The dialog shim in `code/platform/macos/wincontrols.cpp` now creates child
-controls from the PE dialog template — classic and extended, with class,
-identifier, text, style, and rectangles scaled at the 6-by-13 dialog-unit base
-the engine's layout reference expects — and `DialogBoxParam` runs a modal
-message loop that returns the `EndDialog` result. Template lookup searches
-every loaded resource library because the executable is not a PE module on
-macOS; the measuring dialog the executable would provide is mirrored in the
-shim. Shim control classes now use the Win32 mixed-case names the engine
-compares against. The control layer tracks the dialog hierarchy (`GetTopWindow`,
-`GetWindow`, `BringWindowToTop`), screen-space coordinate translation
-(`GetWindowRect`, `MapWindowPoints`), mouse-event routing to child controls,
-button and checkbox state changes, and keyboard navigation in `IsDialogMessage`
-(`VK_RETURN`, `VK_ESCAPE`, `VK_TAB`). The `WinControls` test pins the template
-layout, dialog-unit scaling, hierarchy traversal, button and checkbox clicks,
-keyboard commands, and the modal loop without game assets.
-
-The macOS window layer forces activation only until AppKit reports that the
-window became key. Later application switches do not pull the game back into
-focus, and a borderless full-screen window stays at the normal window level so
-the selected application can appear above it. Closing the main window or
-choosing Quit requests an exit from the AppKit callback; the event pump runs
-the atexit-registered `Prog_End` teardown after the callback returns. The engine
-ignores `WM_CLOSE` by design, so this still quits immediately without the
-engine's own in-mission prompts. The `MacOSWindow` test pins the activation
-latch, full-screen window level, and deferred quit boundary without game
-assets.
+An earlier bring-up drew the main window with AppKit and emulated the Win32
+dialogs from the `Language.dll` templates. Both were removed when upstream
+moved the window to SDL3 and the screens to RmlUi. On that tree, a Debug arm64
+build starts full screen with the Metal renderer, plays the startup movies, and
+shows the RmlUi main menu. Cmd-Q and closing the window reach the engine as a
+close request, which it handles as it does on Windows. The campaign evidence
+below predates the SDL3 change and has not been repeated.
 
 Asset-backed Debug arm64 and x86_64 `-SPAWN` runs load `GDI1A.MAP`, render its
 terrain and radar, and advance the simulation. The arm64 session remained live

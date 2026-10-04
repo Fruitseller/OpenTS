@@ -15,7 +15,7 @@
 #include "dbgprint.h"
 #include "except.h"
 #if defined(OPENTS_MACOS)
-#include "platform/macos/macoswindow.h"
+#include <windows.h>
 #endif
 
 #include "bgfxviews.hh"

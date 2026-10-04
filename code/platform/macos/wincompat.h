@@ -13,6 +13,7 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
+#include <cwctype>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
@@ -668,6 +669,9 @@ constexpr DWORD RT_DIALOG_VALUE = 5;
 #define RT_DIALOG MAKEINTRESOURCE(RT_DIALOG_VALUE)
 #define MAKEINTRESOURCE(identifier) reinterpret_cast<LPCSTR>(static_cast<ULONG_PTR>(static_cast<WORD>(identifier)))
 #define RGB(red, green, blue) (static_cast<COLORREF>(static_cast<BYTE>(red) | (static_cast<WORD>(static_cast<BYTE>(green)) << 8) | (static_cast<DWORD>(static_cast<BYTE>(blue)) << 16)))
+#define GetRValue(color) (static_cast<BYTE>(color))
+#define GetGValue(color) (static_cast<BYTE>(static_cast<WORD>(color) >> 8))
+#define GetBValue(color) (static_cast<BYTE>((color) >> 16))
 #define MAKEWPARAM(low, high) static_cast<WPARAM>(static_cast<WORD>(low) | (static_cast<DWORD>(static_cast<WORD>(high)) << 16))
 #define MAKELPARAM(low, high) static_cast<LPARAM>(static_cast<WORD>(low) | (static_cast<DWORD>(static_cast<WORD>(high)) << 16))
 #define MAKEPOINTS(value) POINTS{static_cast<SHORT>(LOWORD(value)), static_cast<SHORT>(HIWORD(value))}
@@ -681,56 +685,111 @@ constexpr int SM_CYDRAG = 69;
 constexpr int SM_CXFULLSCREEN = 16;
 constexpr int SM_CYFULLSCREEN = 17;
 
-constexpr int VK_DELETE = 0x2E;
-
-#ifndef VK_BACK
-constexpr int VK_BACK = 0x08;
-#endif
-#ifndef VK_TAB
-constexpr int VK_TAB = 0x09;
-#endif
-#ifndef VK_RETURN
-constexpr int VK_RETURN = 0x0D;
-#endif
-#ifndef VK_SHIFT
-constexpr int VK_SHIFT = 0x10;
-#endif
-#ifndef VK_CONTROL
-constexpr int VK_CONTROL = 0x11;
-#endif
-#ifndef VK_MENU
-constexpr int VK_MENU = 0x12;
-#endif
-#ifndef VK_ESCAPE
-constexpr int VK_ESCAPE = 0x1B;
-#endif
-#ifndef VK_SPACE
-constexpr int VK_SPACE = 0x20;
-#endif
-#ifndef VK_PRIOR
-constexpr int VK_PRIOR = 0x21;
-#endif
-#ifndef VK_NEXT
-constexpr int VK_NEXT = 0x22;
-#endif
-#ifndef VK_END
-constexpr int VK_END = 0x23;
-#endif
-#ifndef VK_HOME
-constexpr int VK_HOME = 0x24;
-#endif
-#ifndef VK_LEFT
-constexpr int VK_LEFT = 0x25;
-#endif
-#ifndef VK_UP
-constexpr int VK_UP = 0x26;
-#endif
-#ifndef VK_RIGHT
-constexpr int VK_RIGHT = 0x27;
-#endif
-#ifndef VK_DOWN
-constexpr int VK_DOWN = 0x28;
-#endif
+// Spelled as in keyboard.h so that its definitions of the same names are identical.
+#define VK_LBUTTON 0x01
+#define VK_RBUTTON 0x02
+#define VK_CANCEL 0x03
+#define VK_MBUTTON 0x04
+#define VK_XBUTTON1 0x05
+#define VK_XBUTTON2 0x06
+#define VK_BACK 0x08
+#define VK_TAB 0x09
+#define VK_CLEAR 0x0C
+#define VK_RETURN 0x0D
+#define VK_SHIFT 0x10
+#define VK_CONTROL 0x11
+#define VK_MENU 0x12
+#define VK_PAUSE 0x13
+#define VK_CAPITAL 0x14
+#define VK_ESCAPE 0x1B
+#define VK_SPACE 0x20
+#define VK_PRIOR 0x21
+#define VK_NEXT 0x22
+#define VK_END 0x23
+#define VK_HOME 0x24
+#define VK_LEFT 0x25
+#define VK_UP 0x26
+#define VK_RIGHT 0x27
+#define VK_DOWN 0x28
+#define VK_SELECT 0x29
+#define VK_PRINT 0x2A
+#define VK_EXECUTE 0x2B
+#define VK_SNAPSHOT 0x2C
+#define VK_INSERT 0x2D
+#define VK_DELETE 0x2E
+#define VK_HELP 0x2F
+#define VK_LWIN 0x5B
+#define VK_RWIN 0x5C
+#define VK_APPS 0x5D
+#define VK_SLEEP 0x5F
+#define VK_NUMPAD0 0x60
+#define VK_NUMPAD1 0x61
+#define VK_NUMPAD2 0x62
+#define VK_NUMPAD3 0x63
+#define VK_NUMPAD4 0x64
+#define VK_NUMPAD5 0x65
+#define VK_NUMPAD6 0x66
+#define VK_NUMPAD7 0x67
+#define VK_NUMPAD8 0x68
+#define VK_NUMPAD9 0x69
+#define VK_MULTIPLY 0x6A
+#define VK_ADD 0x6B
+#define VK_SEPARATOR 0x6C
+#define VK_SUBTRACT 0x6D
+#define VK_DECIMAL 0x6E
+#define VK_DIVIDE 0x6F
+#define VK_F1 0x70
+#define VK_F2 0x71
+#define VK_F3 0x72
+#define VK_F4 0x73
+#define VK_F5 0x74
+#define VK_F6 0x75
+#define VK_F7 0x76
+#define VK_F8 0x77
+#define VK_F9 0x78
+#define VK_F10 0x79
+#define VK_F11 0x7A
+#define VK_F12 0x7B
+#define VK_F13 0x7C
+#define VK_F14 0x7D
+#define VK_F15 0x7E
+#define VK_F16 0x7F
+#define VK_F17 0x80
+#define VK_F18 0x81
+#define VK_F19 0x82
+#define VK_F20 0x83
+#define VK_F21 0x84
+#define VK_F22 0x85
+#define VK_F23 0x86
+#define VK_F24 0x87
+#define VK_NUMLOCK 0x90
+#define VK_SCROLL 0x91
+#define VK_LSHIFT 0xA0
+#define VK_RSHIFT 0xA1
+#define VK_LCONTROL 0xA2
+#define VK_RCONTROL 0xA3
+#define VK_LMENU 0xA4
+#define VK_RMENU 0xA5
+#define VK_VOLUME_MUTE 0xAD
+#define VK_VOLUME_DOWN 0xAE
+#define VK_VOLUME_UP 0xAF
+#define VK_MEDIA_NEXT_TRACK 0xB0
+#define VK_MEDIA_PREV_TRACK 0xB1
+#define VK_MEDIA_STOP 0xB2
+#define VK_MEDIA_PLAY_PAUSE 0xB3
+#define VK_OEM_1 0xBA
+#define VK_OEM_PLUS 0xBB
+#define VK_OEM_COMMA 0xBC
+#define VK_OEM_MINUS 0xBD
+#define VK_OEM_PERIOD 0xBE
+#define VK_OEM_2 0xBF
+#define VK_OEM_3 0xC0
+#define VK_OEM_4 0xDB
+#define VK_OEM_5 0xDC
+#define VK_OEM_6 0xDD
+#define VK_OEM_7 0xDE
+#define VK_OEM_8 0xDF
+#define VK_OEM_102 0xE2
 constexpr UINT MB_OK = 0x00000000;
 constexpr UINT MB_OKCANCEL = 0x00000001;
 constexpr UINT MB_YESNO = 0x00000004;
@@ -1445,6 +1504,10 @@ inline DWORD timeGetTime(void)
 	return(static_cast<DWORD>(std::chrono::duration_cast<std::chrono::milliseconds>(now).count()));
 }
 inline DWORD GetTickCount(void) { return(timeGetTime()); }
+inline ULONGLONG GetTickCount64(void)
+{
+	return(static_cast<ULONGLONG>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()));
+}
 inline DWORD GetCurrentThreadId(void)
 {
 	return(static_cast<DWORD>(std::hash<std::thread::id>{}(std::this_thread::get_id())));
@@ -1539,29 +1602,7 @@ inline BOOL QueryPerformanceFrequency(LARGE_INTEGER * value)
 #define MAKEWORD(low, high) static_cast<WORD>((static_cast<BYTE>(low)) | (static_cast<WORD>(static_cast<BYTE>(high)) << 8))
 #define RT_STRING MAKEINTRESOURCE(6)
 
-BOOL PostMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-
-namespace OpenTSMacOS
-{
-	inline std::mutex SocketWatchMutex;
-	inline std::unordered_map<SOCKET, std::shared_ptr<std::atomic_bool>> SocketWatches;
-
-	inline void CancelSocketWatch(SOCKET socket)
-	{
-		std::lock_guard lock(SocketWatchMutex);
-		auto const found = SocketWatches.find(socket);
-		if (found != SocketWatches.end()) {
-			found->second->store(true);
-			SocketWatches.erase(found);
-		}
-	}
-}
-
-inline int closesocket(SOCKET socket)
-{
-	OpenTSMacOS::CancelSocketWatch(socket);
-	return(close(socket));
-}
+inline int closesocket(SOCKET socket) { return(close(socket)); }
 inline int WSAGetLastError(void) { return(errno); }
 struct WSADATA { WORD wVersion; WORD wHighVersion; };
 inline int WSAStartup(WORD version, WSADATA * data)
@@ -1578,41 +1619,6 @@ inline int WSACleanup(void) { return(0); }
 #define WSAECONNREFUSED ECONNREFUSED
 #define WSAEINVAL EINVAL
 
-constexpr long FD_READ = 1;
-constexpr long FD_WRITE = 2;
-#define WSAGETSELECTEVENT(value) LOWORD(value)
-#define WSAGETSELECTERROR(value) HIWORD(value)
-inline int WSAAsyncSelect(SOCKET socket, HWND window, UINT message, long events)
-{
-	int const flags = fcntl(socket, F_GETFL, 0);
-	if (flags < 0 || fcntl(socket, F_SETFL, flags | O_NONBLOCK) != 0) return(SOCKET_ERROR);
-	OpenTSMacOS::CancelSocketWatch(socket);
-	if ((events & FD_READ) != 0 && window != nullptr && message != 0) {
-		auto cancelled = std::make_shared<std::atomic_bool>(false);
-		{
-			std::lock_guard lock(OpenTSMacOS::SocketWatchMutex);
-			OpenTSMacOS::SocketWatches[socket] = cancelled;
-		}
-		std::thread([socket, window, message, cancelled]() {
-			while (!cancelled->load()) {
-				fd_set read_set;
-				FD_ZERO(&read_set);
-				FD_SET(socket, &read_set);
-				timeval timeout = {0, 10000};
-				int const ready = select(socket + 1, &read_set, nullptr, nullptr, &timeout);
-				if (ready < 0 && errno != EINTR) break;
-				if (ready > 0 && FD_ISSET(socket, &read_set)) {
-					PostMessage(window, message, 0, static_cast<LPARAM>(FD_READ));
-				}
-			}
-		}).detach();
-	}
-	if ((events & FD_WRITE) != 0 && window != nullptr && message != 0) {
-		PostMessage(window, message, 0, static_cast<LPARAM>(FD_WRITE));
-	}
-	return(0);
-}
-inline int WSACancelAsyncRequest(HANDLE) { return(0); }
 
 using errno_t = int;
 #ifndef stricmp
@@ -1912,117 +1918,20 @@ inline HWND FindWindow(char const *, char const *) { return(nullptr); }
 inline void OutputDebugString(char const * text) { std::fputs(text, stderr); }
 inline void OutputDebugStringA(char const * text) { OutputDebugString(text); }
 
-LONG_PTR SetWindowLongPtr(HWND window, int index, LONG_PTR value);
-LONG_PTR GetWindowLongPtr(HWND window, int index);
-LONG SetWindowLong(HWND window, int index, LONG value);
-LONG GetWindowLong(HWND window, int index);
-BOOL ShowWindow(HWND window, int command);
-BOOL UpdateWindow(HWND window);
-BOOL CloseWindow(HWND window);
-HWND SetCapture(HWND window);
-HWND GetCapture(void);
-BOOL ReleaseCapture(void);
+// SDL owns the window, so these Win32 window calls have nothing to act on.
+inline BOOL ShowWindow(HWND, int) { return(FALSE); }
+inline BOOL PostMessage(HWND, UINT, WPARAM, LPARAM) { return(FALSE); }
+inline LRESULT DefWindowProc(HWND, UINT, WPARAM, LPARAM) { return(0); }
+inline LRESULT DefWindowProcW(HWND, UINT, WPARAM, LPARAM) { return(0); }
+inline BOOL SetForegroundWindow(HWND) { return(FALSE); }
+inline BOOL InvalidateRect(HWND, RECT const *, BOOL) { return(FALSE); }
+inline HWND SetFocus(HWND) { return(nullptr); }
 
-#define SetWindowLongPtrA SetWindowLongPtr
-#define GetWindowLongPtrA GetWindowLongPtr
-#define SetWindowLongA SetWindowLong
-#define GetWindowLongA GetWindowLong
-
-BOOL PeekMessage(MSG * message, HWND window, UINT minimum, UINT maximum, UINT remove);
-BOOL GetMessage(MSG * message, HWND window, UINT minimum, UINT maximum);
-BOOL PostMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-void PostQuitMessage(int exit_code);
-BOOL TranslateMessage(MSG const * message);
-LRESULT DispatchMessage(MSG const * message);
-LRESULT SendMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-LRESULT DefWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-LRESULT CallWindowProc(WNDPROC procedure, HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-
-ATOM RegisterClass(WNDCLASS const * window_class);
-BOOL UnregisterClass(LPCSTR class_name, HINSTANCE instance);
-HWND CreateWindowEx(DWORD extended_style, LPCSTR class_name, LPCSTR title, DWORD style,
-	int x, int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance, LPVOID parameter);
-BOOL DestroyWindow(HWND window);
-HWND CreateDialogIndirectParam(HINSTANCE instance, LPCDLGTEMPLATE dialog_template, HWND parent,
-	DLGPROC procedure, LPARAM parameter);
-HWND CreateDialogParam(HINSTANCE instance, LPCSTR template_name, HWND parent, DLGPROC procedure, LPARAM parameter);
-INT_PTR DialogBoxParam(HINSTANCE instance, LPCSTR template_name, HWND parent, DLGPROC procedure, LPARAM parameter);
-BOOL EndDialog(HWND dialog, INT_PTR result);
-LRESULT DefDlgProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-BOOL EnumChildWindows(HWND parent, WNDENUMPROC procedure, LPARAM parameter);
-HWND GetDlgItem(HWND dialog, int identifier);
-HWND GetNextDlgTabItem(HWND dialog, HWND control, BOOL previous);
-BOOL SetDlgItemText(HWND dialog, int identifier, LPCSTR text);
-UINT GetDlgItemText(HWND dialog, int identifier, LPSTR text, int size);
-LRESULT SendDlgItemMessage(HWND dialog, int identifier, UINT message, WPARAM wparam, LPARAM lparam);
-BOOL CheckDlgButton(HWND dialog, int identifier, UINT check);
-UINT IsDlgButtonChecked(HWND dialog, int identifier);
-BOOL EnableWindow(HWND window, BOOL enable);
-BOOL IsWindowEnabled(HWND window);
-BOOL IsWindowVisible(HWND window);
-BOOL IsWindow(HWND window);
-BOOL IsChild(HWND parent, HWND window);
-HWND GetParent(HWND window);
-HWND GetWindow(HWND window, UINT command);
-HWND GetTopWindow(HWND parent);
-int GetClassName(HWND window, LPSTR class_name, int size);
-BOOL SetWindowText(HWND window, LPCSTR text);
-HWND GetFocus(void);
-BOOL SetForegroundWindow(HWND window);
-BOOL GetWindowRect(HWND window, RECT * rectangle);
-BOOL MoveWindow(HWND window, int x, int y, int width, int height, BOOL repaint);
-BOOL SetWindowPos(HWND window, HWND insert_after, int x, int y, int width, int height, UINT flags);
-BOOL SetRect(RECT * rectangle, int left, int top, int right, int bottom);
-BOOL PtInRect(RECT const * rectangle, POINT point);
-int MapWindowPoints(HWND source, HWND destination, POINT * points, UINT count);
-HWND ChildWindowFromPoint(HWND parent, POINT point);
-HMONITOR MonitorFromWindow(HWND window, DWORD flags);
-BOOL GetMonitorInfo(HMONITOR monitor, MONITORINFO * information);
-UINT_PTR SetTimer(HWND window, UINT_PTR identifier, UINT interval, TIMERPROC procedure);
-BOOL KillTimer(HWND window, UINT_PTR identifier);
-BOOL AdjustWindowRectEx(RECT * rectangle, DWORD style, BOOL menu, DWORD extended_style);
-BOOL RedrawWindow(HWND window, RECT const * rectangle, HANDLE update_region, UINT flags);
-BOOL BringWindowToTop(HWND window);
-int GetDlgCtrlID(HWND window);
-
-bool OpenTSMacOS_Is_Control_Window(HWND window);
-LRESULT OpenTSMacOS_Send_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-LRESULT OpenTSMacOS_Dispatch_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-LRESULT OpenTSMacOS_Def_Control_Message(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
-BOOL OpenTSMacOS_Get_Control_Rect(HWND window, RECT * rectangle, BOOL client);
-BOOL OpenTSMacOS_Control_Point_Transform(HWND window, POINT * point, BOOL to_screen);
-BOOL OpenTSMacOS_Invalidate_Control(HWND window);
-HWND OpenTSMacOS_Set_Control_Focus(HWND window);
-int OpenTSMacOS_Get_Control_Text(HWND window, LPSTR text, int size);
-BOOL OpenTSMacOS_Get_Native_Window_Rect(HWND window, RECT * rectangle);
-BOOL OpenTSMacOS_Move_Native_Window(HWND window, int x, int y, int width, int height, BOOL repaint);
-
-BOOL GetClientRect(HWND window, RECT * rectangle);
-BOOL GetUpdateRect(HWND window, RECT * rectangle, BOOL erase);
-BOOL ClientToScreen(HWND window, POINT * point);
-BOOL ScreenToClient(HWND window, POINT * point);
-BOOL GetCursorPos(POINT * point);
-BOOL SetCursorPos(int x, int y);
-BOOL ClipCursor(RECT const * rectangle);
-int ShowCursor(BOOL show);
-int GetSystemMetrics(int index);
-BOOL EnumDisplaySettings(LPCSTR lpszDeviceName, DWORD iModeNum, DEVMODEA * lpDevMode);
-#define EnumDisplaySettingsA EnumDisplaySettings
-BOOL InvalidateRect(HWND window, RECT const * rectangle, BOOL erase);
-BOOL ValidateRect(HWND window, RECT const * rectangle);
-HWND SetActiveWindow(HWND window);
-HWND SetFocus(HWND window);
-HMENU GetMenu(HWND window);
-BOOL IsDialogMessage(HWND dialog, MSG * message);
-int TranslateAccelerator(HWND window, HACCEL accelerator, MSG * message);
-int GetWindowText(HWND window, char * text, int size);
-int GetWindowTextLength(HWND window);
-int GetBkMode(HDC context);
-COLORREF GetBkColor(HDC context);
-COLORREF GetTextColor(HDC context);
-COLORREF SetBkColor(HDC context, COLORREF color);
-BOOL IntersectRect(RECT * destination, RECT const * left, RECT const * right);
-HWND WindowFromPoint(POINT point);
+// The drag threshold is Windows' default.
+inline int GetSystemMetrics(int index)
+{
+	return((index == SM_CXDRAG || index == SM_CYDRAG) ? 4 : 0);
+}
 
 inline HBRUSH CreateSolidBrush(COLORREF color) { return(reinterpret_cast<HBRUSH>(static_cast<UINT_PTR>(color) + 1)); }
 inline HGDIOBJ GetStockObject(int object) { return(reinterpret_cast<HGDIOBJ>(static_cast<INT_PTR>(object) + 1)); }
@@ -2080,15 +1989,22 @@ inline LONG RegOpenKeyEx(HKEY, LPCSTR, DWORD, DWORD, HKEY *) { return(1); }
 inline LONG RegQueryValueEx(HKEY, LPCSTR, DWORD *, DWORD *, BYTE *, DWORD *) { return(1); }
 inline LONG RegCloseKey(HKEY) { return(ERROR_SUCCESS); }
 
-#define PostMessageA PostMessage
-#define SendMessageA SendMessage
-#define SetWindowTextA SetWindowText
-int MessageBox(HWND owner, LPCSTR text, LPCSTR caption, UINT style);
-int MessageBoxIndirect(MSGBOXPARAMS const * parameters);
+// SDL tracks the keyboard; no key is held as far as Windows' own state goes.
+inline SHORT GetKeyState(int) { return(0); }
 
-SHORT GetKeyState(int key);
-SHORT GetAsyncKeyState(int key);
-UINT MapVirtualKey(UINT code, UINT map_type);
+// macOS has no Windows keyboard layouts; callers fall back to SDL's key codes and names.
+using HKL = void *;
+constexpr UINT MAPVK_VK_TO_CHAR = 2;
+constexpr UINT MAPVK_VSC_TO_VK_EX = 3;
+inline HKL GetKeyboardLayout(DWORD) { return(nullptr); }
+inline UINT MapVirtualKeyExW(UINT, UINT, HKL) { return(0); }
+inline LPWSTR CharUpperW(LPWSTR text)
+{
+	for (wchar_t * character = text; character != nullptr && *character != L'\0'; ++character) {
+		*character = static_cast<wchar_t>(towupper(*character));
+	}
+	return(text);
+}
 int ToAscii(UINT key, UINT scan_code, BYTE const * state, WORD * result, UINT flags);
 int ToUnicode(UINT key, UINT scan_code, BYTE const * state, LPWSTR buffer, int size, UINT flags);
 int GetKeyNameText(LONG lparam, LPSTR buffer, int size);

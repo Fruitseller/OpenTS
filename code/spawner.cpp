@@ -350,7 +350,7 @@ static bool Spawner_Resume(bool & gameloaded)
 	}
 
 	if (info.Get_Internal_Version() != ExpectedGameVersion) {
-		return(Spawner_Refuse("The saved game is incompatible with this build."));
+		return(Spawner_Refuse("The saved game was made by another version of the game."));
 	}
 
 	// A client never arranges a local network game, so no launch file describes one.

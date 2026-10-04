@@ -208,17 +208,20 @@ ctest --test-dir build/macos-x86_64
 ```
 
 Each build produces a plain arm64 or x86_64 executable in its `bin` directory
-and copies it next to the game data, mirroring the Windows post-build step.
+and copies the repository's `ui/` directory beside it.
 Debug builds define the engine's `_DEBUG` branches and use the `GameD` name;
 Release builds omit them and use `Game`.
-It links AppKit, Metal, and the audio and video frameworks; a Windows
-compatibility layer under `code/platform/macos` supplies the Win32, COM
-storage, DirectSound, and resource-loading interfaces the engine still calls.
+SDL3 provides the window and input, as on Windows. The build links Metal and
+the audio and video frameworks; a Windows compatibility layer under
+`code/platform/macos` supplies the Win32 file, socket, DirectSound, and
+resource-loading interfaces the engine still calls.
 The `code/language` resource DLL is Windows-only and is skipped.
 
-The campaign-launch and basic-play checks recorded in the port plan have passed
-on native arm64 and on x86_64 under Rosetta 2. These checks do not establish
-native Intel runtime coverage or Windows/macOS multiplayer determinism.
+The campaign-launch and basic-play checks recorded in the port plan passed on
+native arm64 and on x86_64 under Rosetta 2 before the move to SDL3; on the SDL3
+tree, only startup to the main menu has been checked on arm64. These checks do
+not establish native Intel runtime coverage or Windows/macOS multiplayer
+determinism.
 
 ## Build from Visual Studio Code
 

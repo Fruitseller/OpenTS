@@ -146,14 +146,12 @@ jobs:
         id: commit
         run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      # Keep the runtime copy separate from the source tree and from any game data.
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
           -DCMAKE_OSX_ARCHITECTURES=${{ matrix.platform.architecture }}
           -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
-          -DTS_RUN_DIR=${{ github.workspace }}/artifact
           -DOPENTS_OFFICIAL_BUILD=${{ inputs.official && 'ON' || 'OFF' }}
 
       - name: Build
@@ -161,6 +159,19 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+      - name: Collect runtime files
+        shell: bash
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: |
+          binary="Game"
+          if [ "${CONFIGURATION}" = "Debug" ]; then
+            binary="GameD"
+          fi
+          mkdir artifact
+          cp "build/bin/${binary}" artifact/
+          cp -R build/bin/ui artifact/
 
       - name: Verify executable architecture and deployment target
         shell: bash
@@ -176,7 +187,7 @@ jobs:
           lipo "${binary}" -verify_arch "${ARCHITECTURE}"
           test "$(otool -l "${binary}" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
 
-      # upload-artifact does not preserve executable permissions, so carry the runtime file
+      # upload-artifact does not preserve executable permissions, so carry the runtime files
       # inside an archive that does.
       - name: Package runtime files
         id: package
@@ -190,10 +201,11 @@ jobs:
             binary="GameD"
           fi
           archive="OpenTS-macOS-${ARCHITECTURE}-${CONFIGURATION}.tar.gz"
-          tar -czf "${archive}" -C artifact "${binary}"
+          tar -czf "${archive}" -C artifact "${binary}" ui
           directory="$(mktemp -d)"
           tar -xzf "${archive}" -C "${directory}"
           test -x "${directory}/${binary}"
+          test -d "${directory}/ui"
           echo "archive=${archive}" >> "$GITHUB_OUTPUT"
 
       - name: Upload runtime files

@@ -26,11 +26,13 @@ static struct MillisecondResolutionClass
 {
 	MillisecondResolutionClass(void)
 	{
+#ifdef _WIN32
 		PROCESS_POWER_THROTTLING_STATE state = {};
 		state.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
 		state.ControlMask = PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
 		state.StateMask = 0;
 		SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &state, sizeof(state));
+#endif
 		timeBeginPeriod(1);
 	}
 	~MillisecondResolutionClass(void) { timeEndPeriod(1); }

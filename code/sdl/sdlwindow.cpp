@@ -83,8 +83,10 @@ void Set_Hints(void)
 	Set_Hint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 	Set_Hint(SDL_HINT_MOUSE_AUTO_CAPTURE, "1");
 	Set_Hint(SDL_HINT_MOUSE_EMULATE_WARP_WITH_RELATIVE, "0");
+#ifdef _WIN32
 	Set_Hint(SDL_HINT_MOUSE_DOUBLE_CLICK_TIME, (int)GetDoubleClickTime());
 	Set_Hint(SDL_HINT_MOUSE_DOUBLE_CLICK_RADIUS, GetSystemMetrics(SM_CXDOUBLECLK) / 2);
+#endif
 	Set_Hint(SDL_HINT_KEYCODE_OPTIONS, "french_numbers,latin_letters");
 }
 
@@ -115,12 +117,17 @@ void Dispatch(WindowEvent const & event)
 }
 
 
+// Only Windows has a window handle for the Win32 calls; elsewhere this is null.
 HWND Window_Handle(void)
 {
+#ifdef _WIN32
 	if (_Window == nullptr) {
 		return(NULL);
 	}
 	return((HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(_Window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr));
+#else
+	return(NULL);
+#endif
 }
 
 
@@ -135,6 +142,7 @@ void Post_Event(Uint32 type)
 }
 
 
+#ifdef _WIN32
 // Windows can end the capture while the window keeps the focus, for a system menu or another
 // window taking the mouse, and SDL reports neither. The window's own releases are ignored.
 LRESULT CALLBACK Watch_Messages(HWND window, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR, DWORD_PTR)
@@ -150,6 +158,7 @@ LRESULT CALLBACK Watch_Messages(HWND window, UINT message, WPARAM wparam, LPARAM
 	}
 	return(result);
 }
+#endif
 
 
 void Handle_SDL_Event(SDL_Event const & sdlevent)
@@ -251,15 +260,19 @@ bool Start_SDL(void)
 
 	Set_Hints();
 
+#ifdef _WIN32
 	// The window class keeps the game's own name, which tools looking for the window use.
 	if (!SDL_RegisterApp("Tiberian Sun", 0, ProgramInstance)) {
 		DebugString("SDL: the window class was not registered: %s\n", SDL_GetError());
 	}
+#endif
 	SDL_SetMainReady();
 
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		DebugString("SDL: video did not start: %s\n", SDL_GetError());
+#ifdef _WIN32
 		SDL_UnregisterApp();
+#endif
 		return(false);
 	}
 
@@ -322,13 +335,17 @@ void Main_Window_Destroy(void)
 	if (_Window != nullptr) {
 		SDL_RemoveEventWatch(Watch_Window, nullptr);
 		SDL_RemoveEventWatch(Watch_Keys, nullptr);
+#ifdef _WIN32
 		RemoveWindowSubclass(Window_Handle(), Watch_Messages, WindowSubclass);
+#endif
 		SDL_DestroyWindow(_Window);
 		_Window = nullptr;
 	}
 
 	SDL_Quit();
+#ifdef _WIN32
 	SDL_UnregisterApp();
+#endif
 	_Started = false;
 }
 
@@ -378,7 +395,9 @@ bool Main_Window_Create(bool windowed, int width, int height)
 
 	SDL_AddEventWatch(Watch_Window, nullptr);
 	SDL_AddEventWatch(Watch_Keys, nullptr);
+#ifdef _WIN32
 	SetWindowSubclass(Window_Handle(), Watch_Messages, WindowSubclass, 0);
+#endif
 	_Input.Reset();
 
 	SDL_ShowWindow(_Window);
@@ -395,7 +414,11 @@ NativeWindow Main_Window_Native(void)
 {
 	NativeWindow window = { NATIVE_WINDOW_DEFAULT, nullptr, nullptr };
 	if (_Window != nullptr) {
+#if defined(_WIN32)
 		window.Handle = SDL_GetPointerProperty(SDL_GetWindowProperties(_Window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+#elif defined(__APPLE__)
+		window.Handle = SDL_GetPointerProperty(SDL_GetWindowProperties(_Window), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
+#endif
 	}
 	return(window);
 }
@@ -547,18 +570,24 @@ void Main_Window_Capture_Mouse(bool capture)
 	}
 	SDL_CaptureMouse(capture);
 
+#ifdef _WIN32
 	// SDL still records a capture Windows took away, so it does not ask for it again.
 	HWND const window = Window_Handle();
 	if (capture && (SDL_GetWindowFlags(_Window) & SDL_WINDOW_MOUSE_CAPTURE) != 0 && GetCapture() != window) {
 		SetCapture(window);
 	}
+#endif
 }
 
 
 bool Main_Window_Mouse_Captured(void)
 {
+#ifdef _WIN32
 	HWND const window = Window_Handle();
 	return(window != NULL && GetCapture() == window);
+#else
+	return(_Window != nullptr && (SDL_GetWindowFlags(_Window) & SDL_WINDOW_MOUSE_CAPTURE) != 0);
+#endif
 }
 
 

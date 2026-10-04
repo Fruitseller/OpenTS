@@ -84,7 +84,7 @@ function(opents_add_test target)
         target_include_directories(${target} BEFORE PRIVATE
             "${CMAKE_SOURCE_DIR}/code/platform/macos"
         )
-        target_compile_definitions(${target} PRIVATE OPENTS_MACOS)
+        target_compile_definitions(${target} PRIVATE OPENTS_MACOS stricmp=strcasecmp strnicmp=strncasecmp)
     endif()
 
     if(TEST_STAMP)
@@ -135,9 +135,12 @@ add_subdirectory(png)
 add_subdirectory(houseset)
 add_subdirectory(uishell)
 add_subdirectory(uilogic)
-add_subdirectory(sdlkeys)
 add_subdirectory(sdlevents)
-add_subdirectory(sdlinput)
+# These two drive Windows keyboard layouts and Windows' own key state.
+if(WIN32)
+    add_subdirectory(sdlkeys)
+    add_subdirectory(sdlinput)
+endif()
 add_subdirectory(keyqueue)
 add_subdirectory(shadigest)
 add_subdirectory(vqadecode)
@@ -155,9 +158,7 @@ add_test(NAME toolkitheaders
 if(APPLE)
 	add_subdirectory(macosaudio)
 	add_subdirectory(macoscompat)
-	add_subdirectory(macoswindow)
 	add_subdirectory(peresource)
-	add_subdirectory(wincontrols)
 endif()
 
 if(WIN32)

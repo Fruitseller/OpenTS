@@ -224,7 +224,9 @@ message(STATUS "${PROJECT_NAME}: Adding compilier definitions...")
 if(WIN32)
     target_compile_definitions(OpenTS PRIVATE WIN32 _WINDOWS NOMINMAX)
 else()
-    target_compile_definitions(OpenTS PRIVATE OPENTS_MACOS $<$<CONFIG:Debug>:_DEBUG>)
+    # The UI sources take MSVC's case-insensitive compares from <string.h> without the engine headers.
+    target_compile_definitions(OpenTS PRIVATE OPENTS_MACOS $<$<CONFIG:Debug>:_DEBUG>
+        stricmp=strcasecmp strnicmp=strncasecmp)
 endif()
 
 #

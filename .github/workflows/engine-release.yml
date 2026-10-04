@@ -54,7 +54,7 @@ jobs:
             tar -xzf "${dir}/OpenTS-macOS-${architecture}-Release.tar.gz" -C "${dir}"
             cp "${language}" "${dir}/"
             chmod +x "${dir}/Game"
-            ( cd "${dir}" && zip "${GITHUB_WORKSPACE}/OpenTS-${TAG}-macOS-${architecture}.zip" Game Language.dll )
+            ( cd "${dir}" && zip -r "${GITHUB_WORKSPACE}/OpenTS-${TAG}-macOS-${architecture}.zip" Game Language.dll ui )
           done
 
       - name: Verify the macOS release zips
@@ -65,6 +65,7 @@ jobs:
             unzip -q "OpenTS-${TAG}-macOS-${architecture}.zip" -d "${directory}"
             test -x "${directory}/Game"
             test -f "${directory}/Language.dll"
+            test -d "${directory}/ui"
             lipo "${directory}/Game" -verify_arch "${architecture}"
             test "$(otool -l "${directory}/Game" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
           done

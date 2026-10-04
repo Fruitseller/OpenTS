@@ -165,6 +165,16 @@ class UIEngineHostClass : public UIShellHostClass
 
 		virtual std::string System_Font_Path(char const * face) const override
 		{
+#ifdef OPENTS_MACOS
+			// The macOS font folders are case-insensitive by default, so Windows file names match.
+			for (char const * directory : { "/System/Library/Fonts/Supplemental/", "/Library/Fonts/" }) {
+				std::string path = std::string(directory) + face;
+				if (GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES) {
+					return(path);
+				}
+			}
+			return(std::string());
+#else
 			char directory[MAX_PATH];
 			unsigned int length = GetWindowsDirectoryA(directory, MAX_PATH);
 			if (length == 0 || length >= MAX_PATH) {
@@ -177,6 +187,7 @@ class UIEngineHostClass : public UIShellHostClass
 			}
 
 			return(path);
+#endif
 		}
 
 		// Looked up per screen, since a saved game mounts archives before the side list exists.
