@@ -62,12 +62,11 @@ ctest --test-dir build/macos --output-on-failure
 Add `-DCMAKE_OSX_ARCHITECTURES=x86_64` and use a separate build directory for
 an Intel build. Use `-DCMAKE_BUILD_TYPE=Release` for a Release build.
 
-Debug produces `GameD`; Release produces `Game` in `build/macos/bin/`. The build
-leaves the installation's `Language.dll` unchanged. After supplying the game
-data in `Run/`, launch the executable from that directory so relative asset paths
-and `Language.dll` resolve there:
+Debug produces `GameD`; Release produces `Game` in `build/macos/bin/`, with the `ui/` directory beside it. The macOS build does not produce `Language.dll`, and the game reads it from the directory holding the executable. Copy the executable and `ui/` into the game data directory that holds `Language.dll`, then start it there:
 
 ```bash title="Terminal"
+cp build/macos/bin/GameD Run/
+cp -R build/macos/bin/ui Run/
 cd Run
-../build/macos/bin/GameD
+./GameD
 ```
