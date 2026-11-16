@@ -56,6 +56,10 @@ std::vector<std::pair<int, int>> Main_Window_Fullscreen_Sizes(void);
 
 void Main_Window_Pump_Events(void);
 
+// Pumps the events only when none were pumped in the last quarter second, so a long load
+// or wait does not make macOS show the busy pointer.
+void Main_Window_Pump_Events_If_Stalled(void);
+
 // Requests made before a pump reach the game as one WINDOW_EVENT_EXPOSED.
 void Main_Window_Request_Repaint(void);
 

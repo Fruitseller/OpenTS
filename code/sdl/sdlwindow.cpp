@@ -38,6 +38,7 @@ SDL_Window * _Window = nullptr;
 int _NativeModals = 0;
 bool _Watching = false;
 bool _Unattended = false;
+Uint64 _LastPump = 0;
 
 SDLInputStateClass _Input;
 
@@ -567,11 +568,20 @@ void Main_Window_Pump_Events(void)
 		return;
 	}
 
+	_LastPump = SDL_GetTicks();
 	SDL_Event sdlevent;
 	while (SDL_PollEvent(&sdlevent)) {
 		if (!Watched(sdlevent.type)) {
 			Handle_SDL_Event(sdlevent);
 		}
+	}
+}
+
+
+void Main_Window_Pump_Events_If_Stalled(void)
+{
+	if (_Window != nullptr && SDL_GetTicks() - _LastPump >= 250) {
+		Main_Window_Pump_Events();
 	}
 }
 

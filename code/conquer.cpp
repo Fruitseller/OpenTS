@@ -538,6 +538,8 @@ void Main_Game(int argc, char * argv[])
  *=============================================================================================*/
 void Call_Back(void)
 {
+	Main_Window_Pump_Events_If_Stalled();
+
 	/*
 	**	Music and speech maintenance
 	*/
