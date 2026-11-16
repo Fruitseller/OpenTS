@@ -702,6 +702,23 @@ SDL_Cursor * Main_Window_Create_Cursor(unsigned int const * pixels, int width, i
 		return(nullptr);
 	}
 
+	// macOS sizes a cursor image in points, so on a high-density display the pixels go in
+	// as an alternate image of a base image sized in points.
+	float const density = Pixel_Density();
+	if (density > 1.0f) {
+		int const basewidth = std::max(1, (int)std::lround(width / density));
+		int const baseheight = std::max(1, (int)std::lround(height / density));
+		SDL_Surface * base = SDL_ScaleSurface(surface, basewidth, baseheight, SDL_SCALEMODE_NEAREST);
+		if (base != nullptr && SDL_AddSurfaceAlternateImage(base, surface)) {
+			SDL_DestroySurface(surface);
+			surface = base;
+			hotx = std::min((int)(hotx / density), basewidth - 1);
+			hoty = std::min((int)(hoty / density), baseheight - 1);
+		} else {
+			SDL_DestroySurface(base);
+		}
+	}
+
 	SDL_Cursor * cursor = SDL_CreateColorCursor(surface, hotx, hoty);
 	SDL_DestroySurface(surface);
 	return(cursor);
