@@ -11,6 +11,7 @@
 
 #include "sdl/sdlevents.h"
 
+#include "sdl/wheelprecision.h"
 #include "win.h"
 
 #include "doctest/doctest.h"
@@ -196,6 +197,56 @@ TEST_CASE("a diagonal turn is a vertical turn and then a horizontal one")
 	CHECK(events[1].Horizontal);
 	CHECK(events[1].Wheel == 1.0f);
 }
+
+
+TEST_CASE("a delta that is a fraction of a notch comes from a precise device")
+{
+	WheelPrecisionClass device;
+	CHECK(device.Classify(0.0f, 0.1f, 1000));
+	CHECK(device.Classify(0.0f, -0.35f, 1001));
+	CHECK_MESSAGE(device.Classify(0.25f, 0.0f, 1002), "a fraction on the horizontal axis counts too");
+}
+
+
+TEST_CASE("a whole notch on its own is a notched wheel")
+{
+	WheelPrecisionClass device;
+	CHECK_FALSE(device.Classify(0.0f, 3.0f, 1000));
+	CHECK_FALSE(device.Classify(-2.0f, 0.0f, 1001));
+}
+
+
+TEST_CASE("a precise device stays precise through whole notches that arrive within the hold")
+{
+	WheelPrecisionClass device;
+	CHECK(device.Classify(0.0f, 0.2f, 1000));
+	CHECK_MESSAGE(device.Classify(0.0f, 1.0f, 1100), "a trackpad that slows to whole notches is still a trackpad");
+}
+
+
+TEST_CASE("a later fractional delta restarts the hold")
+{
+	WheelPrecisionClass device;
+	CHECK(device.Classify(0.0f, 0.2f, 1000));
+	CHECK(device.Classify(0.0f, 0.2f, 1200));
+	CHECK(device.Classify(0.0f, 1.0f, 1300));
+}
+
+
+TEST_CASE("a precise device is a notched wheel again once the hold runs out")
+{
+	WheelPrecisionClass device;
+	CHECK(device.Classify(0.0f, 0.2f, 1000));
+	CHECK_FALSE(device.Classify(0.0f, 1.0f, 1000 + WHEEL_PRECISE_HOLD_MS + 1));
+}
+
+
+#if defined(OPENTS_MACOS)
+TEST_CASE("a fractional scroll is marked as coming from a precise device")
+{
+	CHECK(Translate_One(Wheel(0.0f, 0.05f), WINDOW_EVENT_MOUSE_WHEEL).Precise);
+}
+#endif
 
 
 TEST_CASE("a key press carries its virtual key and the modifiers held, and is neither a repeat nor a system key")

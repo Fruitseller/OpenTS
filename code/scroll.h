@@ -104,7 +104,9 @@ class ScrollClass: public TabClass
 
 		ActionType What_Action(Cell const & cell, ObjectClass * object, bool check_fog);
 
-		void Handle_Window_Event(WindowEvent const & event);
+		// True when the event was a precise scroll over the tactical view, which the game must
+		// not pass on to the sidebar.
+		bool Handle_Window_Event(WindowEvent const & event);
 
 	protected:
 		virtual void Mouse_Right_Press(Point2D const & point = Point2D()) override;
@@ -114,4 +116,5 @@ class ScrollClass: public TabClass
 
 		void Scroll_Edge(Point2D const & point);
 		void Scroll_Coast(Point2D const & point);
+		bool Scroll_Wheel(WindowEvent const & event);
 };

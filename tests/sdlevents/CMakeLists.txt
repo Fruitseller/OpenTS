@@ -6,6 +6,7 @@ opents_add_test(SDLEventsContract
     ENGINE
         sdl/sdlevents.cpp
         sdl/sdlkeys.cpp
+        sdl/wheelprecision.cpp
         utf8.cpp
     DEFINITIONS WIN32 _WINDOWS NOMINMAX
     LIBRARIES SDL3::SDL3-static

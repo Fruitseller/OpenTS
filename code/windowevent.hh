@@ -67,6 +67,13 @@ struct WindowEvent
 	float Wheel = 0.0f;
 	bool Horizontal = false;
 
+	// Set when the event came from a precise device, such as a trackpad or a Magic Mouse,
+	// rather than a notched wheel. Only macOS sets it.
+	bool Precise = false;
+
+	// Set when the system reverses the device's scroll direction, which Wheel has undone.
+	bool Flipped = false;
+
 	// The Windows virtual-key code, which is the engine's identity for a key.
 	int VirtualKey = 0;
 

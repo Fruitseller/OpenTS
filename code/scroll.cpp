@@ -83,6 +83,10 @@ CDTimerClass<SystemTimerClass> ScrollClass::Counter;
 // Caps what a poll may cover, so a wait on a dialog or a load does not return as one long jump.
 #define	MAX_SCROLL_STEPS_PER_POLL	4.0
 
+// A precise device's delta arrives in tenths of the points the fingers moved, so ten pixels
+// per unit keeps the ground under them.
+#define	WHEEL_PAN_PIXELS_PER_UNIT	10.0
+
 static unsigned int _LastScrollPollTime = 0;
 static double _ScrollFraction = 0.0;
 
@@ -90,6 +94,10 @@ static double _ScrollFraction = 0.0;
 static double _EdgeScrollRemainder = 0.0;
 static double _CoastRemainderX = 0.0;
 static double _CoastRemainderY = 0.0;
+
+// Sub-pixel parts of a precise wheel pan, which a slow scroll produces at every event.
+static double _WheelPanRemainderX = 0.0;
+static double _WheelPanRemainderY = 0.0;
 
 
 /***********************************************************************************************
@@ -595,34 +603,40 @@ bool ScrollClass::Is_Scrolling(void) const
 /// A drag keeps the mouse capture so it survives the cursor leaving the window. Events are
 /// dropped while the map is inactive or input is ignored.
 /// </summary>
-void ScrollClass::Handle_Window_Event(WindowEvent const & event)
+/// <returns>True when the event was a precise scroll over the tactical view, which pans the
+/// view and is not passed on to the sidebar.</returns>
+bool ScrollClass::Handle_Window_Event(WindowEvent const & event)
 {
 	if (!TacticalActive) {
-		return;
+		return(false);
 	}
 
 	if (!ScenarioActive && !Debug_Map) {
-		return;
+		return(false);
 	}
 
 	if (!GameActive) {
-		return;
+		return(false);
 	}
 
 	if (TacticalMap == NULL) {
-		return;
+		return(false);
 	}
 
 	if (MouseCursor == NULL) {
-		return;
+		return(false);
 	}
 
 	if (SpecialDialog != SDLG_NONE) {
-		return;
+		return(false);
 	}
 
 	if (IgnoreInput && event.Type != WINDOW_EVENT_CAPTURE_LOST) {
-		return;
+		return(false);
+	}
+
+	if (event.Type == WINDOW_EVENT_MOUSE_WHEEL) {
+		return(Scroll_Wheel(event));
 	}
 
 	Cell			cell;						/// cell click happened over
@@ -687,6 +701,50 @@ void ScrollClass::Handle_Window_Event(WindowEvent const & event)
 			Main_Window_Capture_Mouse(false);
 		}
 	}
+
+	return(false);
+}
+
+
+/// <summary>
+/// Pans the tactical view by the scroll a precise device reports, in the direction the
+/// system's scrolling setting gives any scrolled view. A scroll anywhere but the tactical
+/// view is left to whatever lies under it, such as the sidebar.
+/// </summary>
+/// <param name="event">The wheel event, with its position in frame coordinates.</param>
+/// <returns>True when the event was over the tactical view and was taken.</returns>
+bool ScrollClass::Scroll_Wheel(WindowEvent const & event)
+{
+	if (!event.Precise) {
+		return(false);
+	}
+
+	if (!TacticalRect.Is_Point_Within(Point2D(event.X, event.Y))) {
+		return(false);
+	}
+
+	// The system's own direction setting applies, as it does to any scrolled view on macOS.
+	double const step = (event.Flipped ? event.Wheel : -event.Wheel) * WHEEL_PAN_PIXELS_PER_UNIT;
+
+	double const movex = (event.Horizontal ? step : 0.0) + _WheelPanRemainderX;
+	double const movey = (event.Horizontal ? 0.0 : step) + _WheelPanRemainderY;
+
+	int const distx = int(movex);
+	int const disty = int(movey);
+	_WheelPanRemainderX = movex - distx;
+	_WheelPanRemainderY = movey - disty;
+
+	if (distx != 0) {
+		int distance = abs(distx);
+		Map.Scroll_Map(distx > 0 ? FACING_W : FACING_E, distance, true);
+	}
+
+	if (disty != 0) {
+		int distance = abs(disty);
+		Map.Scroll_Map(disty > 0 ? FACING_S : FACING_N, distance, true);
+	}
+
+	return(true);
 }
 
 

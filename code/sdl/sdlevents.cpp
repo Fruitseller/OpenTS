@@ -10,10 +10,12 @@
 #include "sdl/sdlevents.h"
 
 #include "sdl/sdlkeys.h"
+#include "sdl/wheelprecision.h"
 #include "utf8.h"
 #include "win.h"
 
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_timer.h>
 
 #include <cmath>
 
@@ -48,6 +50,12 @@ WindowEvent Window_Event(WindowEventType type)
 }
 
 }
+
+
+#if defined(OPENTS_MACOS)
+// Only the wheel case reads and writes this.
+static WheelPrecisionClass _WheelPrecision;
+#endif
 
 
 void Window_Events_From_SDL(SDL_Event const & sdlevent, float pixeldensity, int modifiers, std::vector<WindowEvent> & events)
@@ -87,6 +95,10 @@ void Window_Events_From_SDL(SDL_Event const & sdlevent, float pixeldensity, int 
 			event.Modifiers = modifiers;
 			event.X = Pixel(sdlevent.wheel.mouse_x, pixeldensity);
 			event.Y = Pixel(sdlevent.wheel.mouse_y, pixeldensity);
+			event.Flipped = (direction < 0.0f);
+#if defined(OPENTS_MACOS)
+			event.Precise = _WheelPrecision.Classify(sdlevent.wheel.x, sdlevent.wheel.y, SDL_GetTicks());
+#endif
 			if (sdlevent.wheel.y != 0.0f) {
 				event.Wheel = sdlevent.wheel.y * direction;
 				event.Horizontal = false;

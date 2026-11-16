@@ -162,7 +162,7 @@ Twelve commands do the same from the keyboard. Each motion has three commands: o
 | A screenful up | [Sidebar PageUp](/commands/sidebarpageup/) | [Structure List PageUp](/commands/leftsidebarpageup/) | [Unit List PageUp](/commands/rightsidebarpageup/) |
 | A screenful down | [Sidebar PageDown](/commands/sidebarpagedown/) | [Structure List PageDown](/commands/leftsidebarpagedown/) | [Unit List PageDown](/commands/rightsidebarpagedown/) |
 
-Turning the mouse wheel forward runs Sidebar Up, and turning it back runs Sidebar Down, wherever the pointer is.
+A notched mouse wheel runs Sidebar Up when turned forward and Sidebar Down when turned back, wherever the pointer is. On macOS, a trackpad or a Magic Mouse scroll over the tactical view pans the view instead; [Tactical view controls](/systems/view-controls/) covers that.
 
 :::caution[When the scroll commands play ScoldSound]
 The four both-strips commands, including the mouse wheel, play `ScoldSound` only when neither strip can move. A strip already at its end stays silent as long as the other one still moves. The eight one-strip commands never play it, although the arrow buttons for the same motion do.

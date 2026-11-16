@@ -161,7 +161,7 @@ static bool Handle_Event(WindowEvent const & event)
 		frame.Y = point.Y;
 	}
 
-	Map.Handle_Window_Event(frame);
+	bool const map_took_wheel = Map.Handle_Window_Event(frame);
 
 	switch (event.Type) {
 		case WINDOW_EVENT_EXPOSED:
@@ -189,7 +189,7 @@ static bool Handle_Event(WindowEvent const & event)
 			break;
 
 		case WINDOW_EVENT_MOUSE_WHEEL:
-			if (!event.Horizontal) {
+			if (!event.Horizontal && !map_took_wheel) {
 				On_Mouse_Wheel(event.Wheel < 0.0f ? -1 : 1);
 			}
 			break;
