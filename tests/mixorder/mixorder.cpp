@@ -13,6 +13,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -83,7 +84,10 @@ std::string Found_In(char const * filename)
 	if (!MixFileClass::Offset(filename, NULL, &mixfile) || mixfile == NULL) {
 		return(std::string());
 	}
-	return(mixfile->Filename);
+	// POSIX builds keep file names in lowercase.
+	std::string name = mixfile->Filename;
+	std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return((char)std::toupper(c)); });
+	return(name);
 }
 
 

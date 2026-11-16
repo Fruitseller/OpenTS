@@ -56,7 +56,7 @@ cmake -S . -B build/macos -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
 cmake --build build/macos
-ctest --test-dir build/macos --output-on-failure
+ctest --test-dir build/macos -C Debug --output-on-failure
 ```
 
 Add `-DCMAKE_OSX_ARCHITECTURES=x86_64` and use a separate build directory for

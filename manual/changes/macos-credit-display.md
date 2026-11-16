@@ -1,7 +1,7 @@
 ---
 title: Display credits correctly on macOS
 category: fix
-release: 0.2.0
+release: 0.3.0
 targets: []
 credit:
 - Piotr Großmann

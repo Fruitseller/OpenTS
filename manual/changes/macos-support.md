@@ -1,7 +1,7 @@
 ---
 title: Support macOS arm64 and x86_64
 category: feature
-release: 0.2.0
+release: 0.3.0
 targets: []
 credit:
 - Piotr Großmann

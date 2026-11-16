@@ -202,7 +202,7 @@ cmake -S . -B build/macos -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
 cmake --build build/macos
-ctest --test-dir build/macos
+ctest --test-dir build/macos -C Debug
 ```
 
 Use `-DCMAKE_BUILD_TYPE=Release` in a separate build directory for a Release
@@ -215,7 +215,7 @@ cmake -S . -B build/macos-x86_64 -G Ninja \
   -DCMAKE_OSX_ARCHITECTURES=x86_64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
 cmake --build build/macos-x86_64
-ctest --test-dir build/macos-x86_64
+ctest --test-dir build/macos-x86_64 -C Debug
 ```
 
 Each build produces a plain arm64 or x86_64 executable in its `bin` directory

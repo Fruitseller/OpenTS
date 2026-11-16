@@ -116,6 +116,11 @@ void Exception_Register_Log_File(char const * path)
 	if (path) strncpy(RegisteredLogFile, path, sizeof(RegisteredLogFile) - 1);
 }
 
+// The macOS handler shows no dialog, so an unattended run needs no change.
+void Exception_Set_Unattended(bool)
+{
+}
+
 void Exception_Set_Test_Mode(char const * mode)
 {
 	TestMode[0] = '\0';

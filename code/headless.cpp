@@ -42,10 +42,15 @@ namespace Headless
 			Exception_Set_Unattended(true);
 			Main_Window_Set_Unattended(true);
 
+#ifdef _WIN32
 			if (AttachConsole(ATTACH_PARENT_PROCESS)) {
 				FILE * stream = NULL;
 				IsConsoleAttached = freopen_s(&stream, "CONOUT$", "w", stderr) == 0;
 			}
+#else
+			// A macOS process inherits stderr from the shell that started it.
+			IsConsoleAttached = true;
+#endif
 		}
 	}
 

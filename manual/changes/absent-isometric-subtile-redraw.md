@@ -1,7 +1,7 @@
 ---
 title: Load and redraw isometric terrain safely
 category: fix
-release: 0.2.0
+release: 0.3.0
 targets:
 - type: format
   id: scenario-terrain

@@ -1276,6 +1276,14 @@ inline BOOL CreateDirectory(char const * path, void *)
 	return FALSE;
 }
 
+inline BOOL RemoveDirectory(char const * path)
+{
+	std::string const native = OpenTSMacOS::NativePath(path);
+	if (rmdir(native.c_str()) == 0) return(TRUE);
+	SetLastError(errno);
+	return(FALSE);
+}
+
 inline BOOL SetCurrentDirectory(char const * path)
 {
 	std::string const native = OpenTSMacOS::NativePath(path);
