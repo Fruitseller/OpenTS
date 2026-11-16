@@ -91,6 +91,7 @@
 #include "weapon.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <float.h>
 
 
@@ -199,9 +200,12 @@ void Print_CRCs(EventClass const * events, int count, unsigned const * crc_ring,
 		SYSTEMTIME now;
 		GetLocalTime(&now);
 		Delete_Files_Older_Than(debug_dir, "SYNC_*.LOG", SYNC_REPORT_MAX_AGE_DAYS);
-		snprintf(filename, sizeof(filename), "%s\\SYNC_H%d_%02u-%02u-%04u_%02u-%02u-%02u_F%d.LOG",
-			debug_dir, PlayerPtr->HeapID,
-			now.wDay, now.wMonth, now.wYear, now.wHour, now.wMinute, now.wSecond, Frame);
+		char name[128];
+		snprintf(name, sizeof(name), "SYNC_H%d_%02u-%02u-%04u_%02u-%02u-%02u_F%d.LOG",
+			PlayerPtr->HeapID, now.wDay, now.wMonth, now.wYear,
+			now.wHour, now.wMinute, now.wSecond, Frame);
+		std::filesystem::path const report = std::filesystem::path(debug_dir) / name;
+		snprintf(filename, sizeof(filename), "%s", report.string().c_str());
 	} else {
 		snprintf(filename, sizeof(filename), "SYNC%01d.TXT", PlayerPtr->HeapID);
 	}

@@ -1,6 +1,6 @@
 ---
 title: UI files
-summary: Holds the RmlUi documents, style sheets, dialog kit and font that draw the game's screens, in a `ui` directory beside the executable.
+summary: Holds the RmlUi documents, style sheets, dialog kit and font that draw the game's screens, in a `ui` directory beside the executable or in a macOS bundle's Resources.
 category: interface-controls
 keys: []
 related:
@@ -10,7 +10,7 @@ related:
     id: mix
 ---
 
-The `ui` directory sits beside the executable and holds everything the screens are built from. The build places it where `Language.dll` is written, and the release package carries it.
+The `ui` directory sits beside the executable, or in `Contents/Resources/` of a macOS application bundle, and holds everything the screens are built from. The build places it there, and the release package carries it.
 
 | File | Role |
 | --- | --- |
@@ -97,7 +97,7 @@ To give each side its own version of a picture or font, put a copy in each side'
 
 ## Window icon
 
-Put `icon.png` in the `ui` directory beside the executable to replace the running game's window and Alt+Tab icon. Use a square PNG with transparency, such as 256×256 pixels. No image is bundled, and no INI key is needed. The executable's icon in Explorer and pinned shortcut icons stay unchanged. The Debug Console keeps its own icon, and Windows may still show the built-in icon for a grouped taskbar button.
+Put `icon.png` in the `ui` directory beside the executable, or in the bundle's `Contents/Resources/ui/`, to replace the running game's window and Alt+Tab icon. Use a square PNG with transparency, such as 256×256 pixels. No `icon.png` is bundled, and no INI key is needed. The executable's icon in Explorer and pinned shortcut icons stay unchanged. The Debug Console keeps its own icon, and Windows may still show the built-in icon for a grouped taskbar button.
 
 The game uses the first loose `icon.png` found in [its file search order](/formats/opents-ini/#the-order-files-are-searched-for-in), so a copy in a higher-priority folder overrides the one in `ui`. The icon loads before the window is shown and before MIX archives are mounted, so an archive cannot supply it.
 

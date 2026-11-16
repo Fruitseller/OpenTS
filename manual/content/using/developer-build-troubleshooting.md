@@ -32,10 +32,10 @@ On Windows, in `build/bin/<configuration>/`:
 - Debug: `GameD.exe`, `GameD.pdb`, `GameD.map`, `Language.dll`, and the `ui/` directory
 - Release: `Game.exe`, `Game.pdb`, `Game.map`, `Language.dll`, and the `ui/` directory
 
-On macOS, Debug builds `GameD` and Release builds `Game` in `build/macos/bin/`. The macOS build does not replace `Language.dll`.
+On macOS, Debug builds `GameD.app` and Release builds `Game.app` in `build/macos/bin/`. Each bundle holds the executable in `Contents/MacOS/` and the UI in `Contents/Resources/ui/`. The macOS build does not produce `Language.dll`; keep the matching library beside the `.app`.
 
 ## The executable cannot initialize game data
 
-Name the game data directory with [`-DATADIR=<path>`](/using/command-line/#data-directory). Point it at a legitimate Tiberian Sun installation or a copy of its data; the repository and the CMake build directory contain no game assets. A relative path is read from the directory that holds the executable.
+Name the game data directory with [`-DATADIR=<path>`](/using/command-line/#data-directory). Point it at a legitimate Tiberian Sun installation or a copy of its data; the repository and the CMake build directory contain no game assets. A relative path is read from the directory that holds the executable, or from the folder that contains a macOS `.app`.
 
 If the named path does not exist or is not a directory, the game shows a message that the data directory cannot be used, and exits.

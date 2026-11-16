@@ -71,7 +71,9 @@ function(opents_add_test target)
     endforeach()
     foreach(source IN LISTS TEST_ENGINE)
         if(APPLE AND source STREQUAL "dbgprint.cpp")
-            list(APPEND sources "${CMAKE_SOURCE_DIR}/code/platform/macos/dbgprint.cpp")
+            list(APPEND sources
+                "${CMAKE_SOURCE_DIR}/code/platform/macos/dbgprint.cpp"
+                "${CMAKE_SOURCE_DIR}/code/platform/macos/macbundle.cpp")
         else()
             list(APPEND sources "${CMAKE_SOURCE_DIR}/code/${source}")
         endif()

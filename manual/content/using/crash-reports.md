@@ -5,6 +5,7 @@ category: troubleshooting
 source_files:
   - code/except.cpp
   - code/platform/macos/except.cpp
+  - code/platform/macos/macbundle.cpp
   - code/startup.cpp
   - code/init.cpp
 related:
@@ -90,11 +91,12 @@ After writing the folder, the game shows the report and the folder's path in a d
 
 ## macOS crash reports
 
-macOS writes `Crash/crash-report.txt` beside the executable. The file records
-the signal number, fault address, current debug-log path, and a native
-backtrace. A later crash replaces the file. The macOS handler does not write a
-minidump, collect the Windows machine-state sections, or show the Windows crash
-dialog.
+macOS writes `Crash/crash-report.txt` in the user data directory:
+`~/Library/Application Support/OpenTS/` for an application bundle, or the
+directory that holds a plain executable. The file records the signal number,
+fault address, current debug-log path, and a native backtrace. A later crash
+replaces the file. The macOS handler does not write a minidump, collect the
+Windows machine-state sections, or show the Windows crash dialog.
 
 ## Raising a crash on purpose
 

@@ -51,8 +51,10 @@ endorsed by Electronic Arts.
   `OpenTS-<version>-x64.zip`, each containing `Game.exe`, `Language.dll`, and
   `Game.pdb`. The 32-bit build runs on both 32-bit and 64-bit Windows and has
   the longer runtime history; the 64-bit build runs on 64-bit Windows only.
-  Starting with 0.2.0, `OpenTS-<version>-macOS-arm64.zip` and
-  `OpenTS-<version>-macOS-x86_64.zip` contain `Game` and `Language.dll`.
+  `OpenTS-<version>-macOS-arm64.zip` and
+  `OpenTS-<version>-macOS-x86_64.zip` contain the macOS build and
+  `Language.dll`. Releases from 0.3.0 package the build as `Game.app`; 0.2.0
+  archives contain a plain `Game` executable.
 - **Nightly builds** are development snapshots from the
   [Engine nightly](https://github.com/OpenTS-Developers/OpenTS/actions/workflows/engine-nightly.yml)
   workflow. Download the latest one without a GitHub account through
@@ -78,12 +80,14 @@ On macOS 15 or newer:
 
 1. Copy the data directory from a legitimate Tiberian Sun installation.
 2. Extract a 0.2.0 or newer release zip for the Mac's architecture into that
-   directory. For an earlier revision, build the executable from source.
-3. Open Terminal in that directory and run `./Game`.
+   directory. From 0.3.0, the zip holds `Game.app`. For an earlier revision,
+   build the executable from source.
+3. Open `Game.app`. The folder that holds it is the data directory, so no
+   launch option is needed.
 
-The macOS executable is not notarized. If macOS blocks its first launch, use
-**Open Anyway** in **System Settings > Privacy & Security**, then launch it
-again from Terminal.
+The macOS app is not notarized. If macOS blocks its first launch, use
+**Open Anyway** in **System Settings > Privacy & Security**, then open it
+again.
 
 Wine may work, but there is no supported native Linux build.
 

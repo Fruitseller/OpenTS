@@ -96,7 +96,7 @@ The file opens with the frame count, the average frame rate, the largest look-ah
 
 ## The sync dump
 
-A network game that goes out of sync writes an [out-of-sync report](/using/out-of-sync-reports/) into the `Debug` folder beside the executable, in either configuration. The [`PrintCRC`](/keys/printcrc/) playback trap writes the same report at a chosen frame and then exits. The report page describes what the report holds.
+A network game that goes out of sync writes an [out-of-sync report](/using/out-of-sync-reports/) into the `Debug` folder, in either configuration. The [`PrintCRC`](/keys/printcrc/) playback trap writes the same report at a chosen frame and then exits. The report page describes what the report holds.
 
 Seven `sun.ini` settings exist for tracking down a desynchronized game, and only `PrintCRC` has an effect:
 
@@ -107,7 +107,7 @@ Seven `sun.ini` settings exist for tracking down a desynchronized game, and only
 
 ## Crash reporting
 
-Both configurations report crashes. A crash writes a folder under `Exceptions` beside the executable, holding a minidump, a readable report and the end of that run's debug log. [Crash reports](/using/crash-reports/) describes the folder and what the report holds.
+On Windows, both configurations report crashes. A crash writes a folder under `Exceptions` beside the executable, holding a minidump, a readable report and the end of that run's debug log. [Crash reports](/using/crash-reports/) describes the folder and what the report holds.
 
 While a debugger is attached, the debugger receives the crash instead, and no crash folder is written.
 

@@ -13,6 +13,7 @@
 #include "always.h"
 
 #include "dbgprint.h"
+#include "macbundle.h"
 #include "opents_build.h"
 #include "windows.h"
 
@@ -198,10 +199,26 @@ void Init_Locked()
 		Command_Line_Requests_Console();
 #endif
 
-	char executable[PROC_PIDPATHINFO_MAXSIZE] = {};
-	if (proc_pidpath(getpid(), executable, sizeof(executable)) > 0) {
+	std::filesystem::path directory;
+	bool located = false;
+
+	if (OpenTSMacOS::Executable_Is_Bundled()) {
+		// A bundle is read-only to the player, so its logs belong with the rest of the
+		// player's files.
+		directory = OpenTSMacOS::User_Data_Directory();
+		located = !directory.empty();
+	} else {
+		char executable[PROC_PIDPATHINFO_MAXSIZE] = {};
+		if (proc_pidpath(getpid(), executable, sizeof(executable)) > 0) {
+			std::error_code error;
+			directory = std::filesystem::weakly_canonical(executable, error).parent_path();
+			located = true;
+		}
+	}
+
+	if (located) {
 		std::error_code error;
-		std::filesystem::path directory = std::filesystem::weakly_canonical(executable, error).parent_path() / "Debug";
+		directory /= "Debug";
 		std::filesystem::create_directories(directory, error);
 		strncpy(DebugDirectory, directory.c_str(), sizeof(DebugDirectory) - 1);
 		Delete_Files_Older_Than(directory.c_str(), "DEBUG_*.LOG", DebugLogMaxAgeDays);

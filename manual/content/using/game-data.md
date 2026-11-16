@@ -6,6 +6,8 @@ source_files:
   - README.md
   - code/addon.cpp
   - code/gamedirs.cpp
+  - code/platform/macos/macbundle.cpp
+  - code/startup.cpp
   - docs/BUILDING.md
   - Run/place_steam_build_here
 related:
@@ -29,13 +31,13 @@ Keep the data in `Run/`, not in the CMake build directory. A build writes its ou
 
 The game offers Firestorm only when it finds `FIRESTRM.INI`, either as a loose file or inside `PATCH.MIX`, `PCACHE.MIX`, or an `EXPAND` or `ECACHE` [archive](/formats/mix/). No other expansion file is checked. Without `FIRESTRM.INI` only the base game can be played, and with it Firestorm is offered even when other expansion files are missing. `RulesExpansion` in [`OPENTS.INI`](/formats/opents-ini/) can name a different file.
 
-The macOS build reads the `Language.dll` already in the game-data directory; official macOS release archives from 0.2.0 onward include the matching library.
+The macOS build reads `Language.dll` from the folder that holds the `.app`, or beside a plain executable. Official macOS release archives from 0.2.0 onward include the matching library.
 
 ## Keeping the data somewhere else
 
-[`-DATADIR=<path>`](/using/command-line/#data-directory) names the game data directory, which the game reads its data from and never writes to. Without it, the game reads its data from the directory that holds the executable.
+[`-DATADIR=<path>`](/using/command-line/#data-directory) names the game data directory, which the game reads its data from and never writes to. Without it, the game reads its data from the directory that holds the executable. A macOS application bundle uses the folder that contains the `.app`, because the bundle's own `Contents/MacOS` and `Contents/Resources` directories hold the program and its interface files, not game data. A relative path starts from the same directory.
 
-[`-USERDIR=<path>`](/using/command-line/#user-directory) names the user data directory, which receives every file the game writes, including settings, saved games, recordings and downloaded maps. Without it, the game writes these files beside the executable. The exceptions are the debug log, [out-of-sync reports](/using/out-of-sync-reports/) and [crash reports](/using/crash-reports/), which always go into folders beside the executable.
+[`-USERDIR=<path>`](/using/command-line/#user-directory) names the user data directory, which receives every file the game writes, including settings, saved games, recordings and downloaded maps. Without it, the game writes these files beside the executable. A macOS application bundle writes them to `~/Library/Application Support/OpenTS/` and creates the folder. In a macOS application bundle, the debug log, [out-of-sync reports](/using/out-of-sync-reports/) and [crash reports](/using/crash-reports/) go there as well. On Windows, and for a plain macOS executable, those three go into folders beside the executable.
 
 When the game looks for a file, it checks the user data directory first, so a player's copy is read ahead of a shipped copy with the same name. One copy of the data can therefore serve several players, each with a user data directory that holds their own settings and saves. [`OPENTS.INI`](/formats/opents-ini/#the-order-files-are-searched-for-in) gives the full search order and the files it does not apply to.
 

@@ -61,6 +61,8 @@ message(STATUS "${PROJECT_NAME}: Creating '${PROJECT_NAME}' executable...")
 
 if(WIN32)
     add_executable(OpenTS WIN32 ${OPENTS_SRC})
+elseif(APPLE)
+    add_executable(OpenTS MACOSX_BUNDLE ${OPENTS_SRC})
 else()
     add_executable(OpenTS ${OPENTS_SRC})
 endif()
@@ -91,6 +93,54 @@ set_target_properties(OpenTS PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:OpenTS>"
     VS_DEBUGGER_COMMAND_ARGUMENTS "-DATADIR=${OPENTS_GAME_DIR}"
 )
+
+if(APPLE)
+    # The bundle name and executable name stay apart: the folder is GameD.app or Game.app
+    # after the configuration's output name, while the menu reads OpenTS. The version comes
+    # from the header GitStamp writes.
+    set(OPENTS_BUNDLE_NAME "OpenTS")
+    set(OPENTS_BUNDLE_IDENTIFIER "org.opents.OpenTS")
+    set(OPENTS_ICON_FILE "OpenTS.icns")
+
+    file(STRINGS "${OPENTS_VERSION_HEADER}" OPENTS_VERSION_DEFINE
+        REGEX "^#define OPENTS_VERSION[ ]+\"")
+    string(REGEX REPLACE "^#define OPENTS_VERSION[ ]+\"([^\"]*)\".*$"
+        "\\1" OPENTS_APP_VERSION "${OPENTS_VERSION_DEFINE}")
+    if(OPENTS_APP_VERSION STREQUAL "")
+        set(OPENTS_APP_VERSION "${PROJECT_VERSION}")
+    endif()
+
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(OPENTS_MINIMUM_SYSTEM_VERSION "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    else()
+        set(OPENTS_MINIMUM_SYSTEM_VERSION "15.0")
+    endif()
+
+    set_target_properties(OpenTS PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/platform/macos/Info.plist.in"
+        MACOSX_BUNDLE_BUNDLE_NAME "${OPENTS_BUNDLE_NAME}"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${OPENTS_BUNDLE_IDENTIFIER}"
+        MACOSX_BUNDLE_ICON_FILE "${OPENTS_ICON_FILE}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${OPENTS_APP_VERSION}"
+    )
+
+    find_program(OPENTS_SIPS_EXECUTABLE sips REQUIRED)
+    find_program(OPENTS_ICONUTIL_EXECUTABLE iconutil REQUIRED)
+    find_program(OPENTS_CODESIGN_EXECUTABLE codesign REQUIRED)
+
+    add_custom_command(TARGET OpenTS POST_BUILD
+        COMMAND "${CMAKE_COMMAND}"
+            "-DOPENTS_ICON_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/resources/app-icon/opents.ico"
+            "-DOPENTS_ICON_OUTPUT=$<TARGET_BUNDLE_CONTENT_DIR:OpenTS>/Resources/${OPENTS_ICON_FILE}"
+            "-DOPENTS_ICON_WORK_DIR=${CMAKE_BINARY_DIR}/iconset"
+            "-DSIPS_EXECUTABLE=${OPENTS_SIPS_EXECUTABLE}"
+            "-DICONUTIL_EXECUTABLE=${OPENTS_ICONUTIL_EXECUTABLE}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/platform/macos/GenerateIcns.cmake"
+        COMMENT "Generating the application icon"
+        VERBATIM
+    )
+endif()
 
 #
 # ---------------------------------------------------------
@@ -349,14 +399,28 @@ source_group("Header Files" REGULAR_EXPRESSION ".*\\.(h|hpp)$")
 # UI files
 # ---------------------------------------------------------
 #
-# The game reads the ui directory from beside the executable. A separate target copies it
-# there, so an edited document reaches the output without a relink.
-add_custom_target(OpenTSUIFiles ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/ui" "$<TARGET_FILE_DIR:OpenTS>/ui"
-    COMMENT "Copying the UI files beside the executable"
-    VERBATIM
-)
-add_dependencies(OpenTS OpenTSUIFiles)
+# The game reads the ui directory from beside the executable, or from the bundle's
+# Resources, which is where a macOS application keeps files it ships. A separate target
+# keeps the copy current without a relink.
+if(APPLE)
+    add_custom_target(OpenTSUIFiles ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/ui" "$<TARGET_BUNDLE_CONTENT_DIR:OpenTS>/Resources/ui"
+        # The linker signs the executable before the resources exist, so signing again here
+        # gives the bundle the resource envelope its verification expects.
+        COMMAND "${OPENTS_CODESIGN_EXECUTABLE}" --force --sign - "$<TARGET_BUNDLE_DIR:OpenTS>"
+        DEPENDS OpenTS
+        COMMENT "Copying the UI files into the application bundle"
+        VERBATIM
+    )
+else()
+    add_custom_target(OpenTSUIFiles ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/ui" "$<TARGET_FILE_DIR:OpenTS>/ui"
+        COMMENT "Copying the UI files beside the executable"
+        VERBATIM
+    )
+    add_dependencies(OpenTS OpenTSUIFiles)
+endif()
 
 #
 # ---------------------------------------------------------

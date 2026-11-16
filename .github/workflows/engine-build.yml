@@ -196,13 +196,12 @@ jobs:
         env:
           CONFIGURATION: ${{ matrix.configuration }}
         run: |
-          binary="Game"
+          bundle="Game.app"
           if [ "${CONFIGURATION}" = "Debug" ]; then
-            binary="GameD"
+            bundle="GameD.app"
           fi
           mkdir artifact
-          cp "build/bin/${binary}" artifact/
-          cp -R build/bin/ui artifact/
+          cp -R "build/bin/${bundle}" artifact/
 
       - name: Verify executable architecture and deployment target
         shell: bash
@@ -210,13 +209,19 @@ jobs:
           CONFIGURATION: ${{ matrix.configuration }}
           ARCHITECTURE: ${{ matrix.platform.architecture }}
         run: |
-          binary="artifact/Game"
+          bundle="artifact/Game.app"
+          executable="${bundle}/Contents/MacOS/Game"
           if [ "${CONFIGURATION}" = "Debug" ]; then
-            binary="artifact/GameD"
+            bundle="artifact/GameD.app"
+            executable="${bundle}/Contents/MacOS/GameD"
           fi
-          test -x "${binary}"
-          lipo "${binary}" -verify_arch "${ARCHITECTURE}"
-          test "$(otool -l "${binary}" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
+          test -x "${executable}"
+          lipo "${executable}" -verify_arch "${ARCHITECTURE}"
+          test "$(otool -l "${executable}" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
+          test -f "${bundle}/Contents/Info.plist"
+          test -f "${bundle}/Contents/Resources/OpenTS.icns"
+          test -d "${bundle}/Contents/Resources/ui"
+          codesign --verify "${bundle}"
 
       # upload-artifact does not preserve executable permissions, so carry the runtime files
       # inside an archive that does.
@@ -227,16 +232,19 @@ jobs:
           CONFIGURATION: ${{ matrix.configuration }}
           ARCHITECTURE: ${{ matrix.platform.architecture }}
         run: |
-          binary="Game"
+          bundle="Game.app"
+          executable="Game"
           if [ "${CONFIGURATION}" = "Debug" ]; then
-            binary="GameD"
+            bundle="GameD.app"
+            executable="GameD"
           fi
           archive="OpenTS-macOS-${ARCHITECTURE}-${CONFIGURATION}.tar.gz"
-          tar -czf "${archive}" -C artifact "${binary}" ui
+          tar -czf "${archive}" -C artifact "${bundle}"
           directory="$(mktemp -d)"
           tar -xzf "${archive}" -C "${directory}"
-          test -x "${directory}/${binary}"
-          test -d "${directory}/ui"
+          test -x "${directory}/${bundle}/Contents/MacOS/${executable}"
+          test -d "${directory}/${bundle}/Contents/Resources/ui"
+          codesign --verify "${directory}/${bundle}"
           echo "archive=${archive}" >> "$GITHUB_OUTPUT"
 
       - name: Upload runtime files

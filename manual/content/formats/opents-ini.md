@@ -115,15 +115,15 @@ Each save keeps what it was written with. Turning the key off makes new saves sm
 
 `OPENTS.INI` must be a loose file, because the game does not read it from an archive. The game looks for it in the game data directory, then in that directory's `INI` and `MIX` folders, and reads the first copy it finds. The user data directory is not searched for it.
 
-The game data directory is the one [`-DATADIR`](/using/command-line/#data-directory) names, or the game's own directory when that option is not used.
+The game data directory is the one [`-DATADIR`](/using/command-line/#data-directory) names, or the game's own directory when that option is not used. For a macOS application bundle, the game's own directory is the folder that contains the `.app`.
 
 ## The order files are searched for in
 
-1. the user data directory, when [`-USERDIR`](/using/command-line/#user-directory) names one;
+1. the user data directory: the one [`-USERDIR`](/using/command-line/#user-directory) names, or `~/Library/Application Support/OpenTS/` for a macOS application bundle;
 2. the game's own directory;
 3. the game data directory, when [`-DATADIR`](/using/command-line/#data-directory) names one;
 4. the folders `SearchPaths` lists, in the order written;
-5. the `ui` folder in the game's own directory.
+5. the `ui` folder: in the game's own directory, or in a macOS application bundle's `Contents/Resources/`.
 
 The game opens every file in this order, including archives, INI files, scenarios and launch files, and uses the first copy it finds. A loose copy in any of these directories is used ahead of an archived copy of the same name. The exception is data the game reads straight from a cached archive, such as the palettes above and many shapes, where a loose copy is not used; [MIX archives](/formats/mix/#caching) covers it.
 
@@ -134,7 +134,7 @@ A search by pattern covers every directory in the list, and does not stop at the
 [Saved games](/formats/save-games/) and [screen captures](/commands/screencapture/) are not searched for. Saves are written, listed, loaded and deleted only in a `Saved Games` folder in the user data directory, or in the game's own directory when there is none, so a launcher finds every save in one place. Screen captures go only to a `Screenshots` folder in the same directory.
 
 :::caution[Do not ship a file the game writes in the game's own directory]
-Settings, saved games, recordings, screen captures and the other files the game writes go to the user data directory, or to the game's own directory when there is none. The debug log, out-of-sync reports and crash reports always go into folders beside the executable, as [Game data](/using/game-data/#keeping-the-data-somewhere-else) describes. `mpstats.txt` always goes to the game's own directory.
+Settings, saved games, recordings, screen captures and the other files the game writes go to the user data directory, or to the game's own directory when there is none. The debug log, out-of-sync reports and crash reports go into the user data directory for a macOS application bundle, and into folders beside the executable on Windows and for a plain macOS executable, as [Game data](/using/game-data/#keeping-the-data-somewhere-else) describes. `mpstats.txt` always goes to the game's own directory.
 
 A file the game writes is found ahead of a shipped copy in a later directory, so a player's saved `SUN.INI` is read instead of one shipped in the `INI` folder. When the player's copy of a file such as `KEYBOARD.INI` is removed, the game reads the shipped copy again. Without a user data directory, the game writes and deletes in its own directory, so a copy shipped there is overwritten or removed and cannot be read again.
 :::

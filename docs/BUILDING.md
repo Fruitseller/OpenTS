@@ -218,8 +218,13 @@ cmake --build build/macos-x86_64
 ctest --test-dir build/macos-x86_64 -C Debug
 ```
 
-Each build produces a plain arm64 or x86_64 executable in its `bin` directory
-and copies the repository's `ui/` directory beside it.
+Each build produces a macOS application bundle in its `bin` directory:
+`GameD.app` for Debug and `Game.app` for Release. Inside the bundle,
+`Contents/MacOS/` holds the executable, `Contents/Resources/ui/` holds the
+repository's UI documents, `Contents/Resources/OpenTS.icns` is the icon, and
+`Contents/Info.plist` names the application OpenTS and records its version and
+minimum macOS version. The build signs the bundle ad hoc after copying those
+resources.
 Debug builds define the engine's `_DEBUG` branches and use the `GameD` name;
 Release builds omit them and use `Game`.
 SDL3 provides the window and input, as on Windows. The build links Metal and
@@ -227,6 +232,21 @@ the audio and video frameworks; a Windows compatibility layer under
 `code/platform/macos` supplies the Win32 file, socket, DirectSound, and
 resource-loading interfaces the engine still calls.
 The `code/language` resource DLL is Windows-only and is skipped.
+
+The folder that contains the `.app` is the default game data directory. To run
+against the repository's `Run/` directory, copy the bundle there and open it:
+
+```bash
+cp -R build/macos/bin/GameD.app Run/
+open Run/GameD.app
+```
+
+The game writes its settings, saved games, debug log, out-of-sync reports, and
+crash report to `~/Library/Application Support/OpenTS/` and creates the folder.
+`-USERDIR=` names a different user data directory for settings, saves, and the
+other files the game writes. The debug log, out-of-sync reports, and crash
+report stay in `~/Library/Application Support/OpenTS/`. `Language.dll` is read
+from the folder that contains the `.app`, so keep it there.
 
 The campaign-launch and basic-play checks recorded in the port plan passed on
 native arm64 and on x86_64 under Rosetta 2 before the move to SDL3; on the SDL3
@@ -319,8 +339,8 @@ symbol file, `ui/` directory, and license notices. Artifact names contain the
 platform, configuration, and short commit, as in `opents-x64-Release-ab12cd3`.
 Linker maps are omitted because the symbol files are sufficient. The same
 workflow builds and tests macOS arm64 and x86_64 Debug and Release, verifies
-each executable's architecture and macOS 15.0 deployment target, and uploads
-the runtime files in permission-preserving archives. A failure on any platform
+each bundle's executable architecture and macOS 15.0 deployment target, and
+uploads the bundle in permission-preserving archives. A failure on any platform
 fails the workflow.
 After a successful pull-request build, `Engine build comment` maintains one
 pull-request comment with direct nightly.link downloads.
@@ -330,9 +350,9 @@ pass, it builds the release commit for every platform with
 `-DOPENTS_OFFICIAL_BUILD=ON` and the tag's prerelease label. Each Windows zip holds
 `Game.exe`, `Language.dll`, `Game.pdb`, `ui/`, and the project and third-party
 license notices and is named after the release tag and the platform, such as
-`OpenTS-v0.2.0-x64.zip`. The macOS arm64 and x86_64 zips hold `Game`, `ui/`,
-and the Win32 build's `Language.dll`. It attaches all of them to the release,
-and appends notes generated from the manual's change records by
+`OpenTS-v0.2.0-x64.zip`. The macOS arm64 and x86_64 zips hold `Game.app` and
+the Win32 build's `Language.dll` beside it. It attaches all of them to the
+release, and appends notes generated from the manual's change records by
 `python manual/tools/manage.py release-notes`. See
 [Releases and lifecycle](../manual/MAINTAINING.md#releases-and-lifecycle) for
 the checks and the full release procedure.

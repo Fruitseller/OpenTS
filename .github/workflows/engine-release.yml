@@ -140,8 +140,7 @@ jobs:
             dir="$(ls -d artifact/opents-release-macOS-${architecture}-Release-* | head -n 1)"
             tar -xzf "${dir}/OpenTS-macOS-${architecture}-Release.tar.gz" -C "${dir}"
             cp "${language}" "${dir}/"
-            chmod +x "${dir}/Game"
-            ( cd "${dir}" && zip -r "${GITHUB_WORKSPACE}/OpenTS-${TAG}-macOS-${architecture}.zip" Game Language.dll ui )
+            ( cd "${dir}" && zip -r "${GITHUB_WORKSPACE}/OpenTS-${TAG}-macOS-${architecture}.zip" Game.app Language.dll )
           done
 
       - name: Verify the macOS release zips
@@ -150,11 +149,13 @@ jobs:
             directory="extracted-${architecture}"
             mkdir "${directory}"
             unzip -q "OpenTS-${TAG}-macOS-${architecture}.zip" -d "${directory}"
-            test -x "${directory}/Game"
+            executable="${directory}/Game.app/Contents/MacOS/Game"
+            test -x "${executable}"
             test -f "${directory}/Language.dll"
-            test -d "${directory}/ui"
-            lipo "${directory}/Game" -verify_arch "${architecture}"
-            test "$(otool -l "${directory}/Game" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
+            test -d "${directory}/Game.app/Contents/Resources/ui"
+            lipo "${executable}" -verify_arch "${architecture}"
+            test "$(otool -l "${executable}" | awk '$1 == "minos" { print $2; exit }')" = "15.0"
+            codesign --verify "${directory}/Game.app"
           done
 
       - name: Attach the zips to the release

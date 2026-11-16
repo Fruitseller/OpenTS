@@ -96,6 +96,9 @@
 #include "levitate.h"
 #include "light.h"
 #include "lightcon.h"
+#ifdef OPENTS_MACOS
+#include "macbundle.h"
+#endif
 #include "mech.h"
 #include "misc.h"
 #include "mixfile.h"
@@ -458,6 +461,15 @@ int CALLBACK WinMain ( HINSTANCE instance , HINSTANCE , char * , int )
 
 	Debug_Init();
 
+#ifdef OPENTS_MACOS
+	// The game reads its data from the folder that holds the .app, so a relative data path
+	// and the language library resolve there rather than inside the bundle.
+	bool const bundled = OpenTSMacOS::Executable_Is_Bundled();
+	if (bundled) {
+		SetCurrentDirectory(OpenTSMacOS::Bundle_Parent_Directory().c_str());
+	}
+#endif
+
 	// Handed over now because the exception path may not ask the logger for anything: the
 	// thread that crashed may be the one holding the logger's lock.
 	Exception_Register_Log_File(Debug_Log_File_Name());
@@ -500,9 +512,23 @@ int CALLBACK WinMain ( HINSTANCE instance , HINSTANCE , char * , int )
 	char dir[_MAX_DIR];
 	_splitpath(argv[0], drive, dir, NULL, NULL);
 	_makepath(path, drive, dir, NULL, NULL);
-	SetCurrentDirectory(path);
+#ifdef OPENTS_MACOS
+	if (!bundled)
+#endif
+	{
+		SetCurrentDirectory(path);
+	}
 
 	int error_code = EXIT_FAILURE;
+
+#ifdef OPENTS_MACOS
+	if (bundled) {
+		// Named before the command line is read, so an option that names either directory
+		// replaces the bundle's default.
+		Set_Data_Directory(OpenTSMacOS::Bundle_Parent_Directory().c_str());
+		Set_User_Directory(OpenTSMacOS::User_Data_Directory().c_str());
+	}
+#endif
 
 	bool const parsed = Parse_Command_Line(argc, argv);
 
@@ -529,7 +555,15 @@ int CALLBACK WinMain ( HINSTANCE instance , HINSTANCE , char * , int )
 		DeploymentConfig.Read_File(Data_Directory().c_str());
 		Init_Search_Folders(DeploymentConfig.SearchPaths.c_str());
 
-		std::string uidirectory = path;
+		std::string uidirectory;
+#ifdef OPENTS_MACOS
+		if (bundled) {
+			uidirectory = OpenTSMacOS::Bundle_Resources_Directory();
+		} else
+#endif
+		{
+			uidirectory = path;
+		}
 		if (!uidirectory.empty() && uidirectory.back() != '\\' && uidirectory.back() != '/') {
 			uidirectory += '\\';
 		}

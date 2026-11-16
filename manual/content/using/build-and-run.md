@@ -62,11 +62,19 @@ ctest --test-dir build/macos -C Debug --output-on-failure
 Add `-DCMAKE_OSX_ARCHITECTURES=x86_64` and use a separate build directory for
 an Intel build. Use `-DCMAKE_BUILD_TYPE=Release` for a Release build.
 
-Debug produces `GameD`; Release produces `Game` in `build/macos/bin/`, with the `ui/` directory beside it. The macOS build does not produce `Language.dll`, and the game reads it from the directory holding the executable. Copy the executable and `ui/` into the game data directory that holds `Language.dll`, then start it there:
+Debug produces `GameD.app`; Release produces `Game.app` in `build/macos/bin/`. The bundle holds the executable in `Contents/MacOS/`, the UI in `Contents/Resources/ui/`, and an `OpenTS.icns` icon. The build signs the bundle ad hoc after copying those resources.
+
+The folder that contains the `.app` is the default game data directory. Put the data in `Run/`, copy the bundle there, and open it:
 
 ```bash title="Terminal"
-cp build/macos/bin/GameD Run/
-cp -R build/macos/bin/ui Run/
-cd Run
-./GameD
+cp -R build/macos/bin/GameD.app Run/
+open Run/GameD.app
 ```
+
+The macOS build does not produce `Language.dll`; keep the matching library beside the `.app`. To run a bundle from the build directory, name the data directory:
+
+```bash title="Terminal"
+open build/macos/bin/GameD.app --args -DATADIR="$PWD/Run"
+```
+
+The game writes its settings, saved games, debug log, out-of-sync reports, and crash report to `~/Library/Application Support/OpenTS/`. [Game data](/using/game-data/) describes the directories and their options.

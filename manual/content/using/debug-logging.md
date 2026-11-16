@@ -1,10 +1,11 @@
 ---
 title: Debug logs and console
-summary: Every run writes a timestamped log beside the executable and can show the output live.
+summary: Every run writes a timestamped log and can show the output live.
 category: troubleshooting
 source_files:
   - code/dbgprint.cpp
   - code/platform/macos/dbgprint.cpp
+  - code/platform/macos/macbundle.cpp
   - code/startup.cpp
   - code/init.cpp
 related:
@@ -16,7 +17,7 @@ related:
 
 ## Where the log is written
 
-Every run, in Release and Debug builds alike, writes a new log to a `Debug` folder in the directory that holds the executable. The file is named for the local time the process started:
+Every run, in Release and Debug builds alike, writes a new log to a `Debug` folder. On Windows, and for a plain macOS executable, that folder is in the directory that holds the executable. A macOS application bundle writes to `~/Library/Application Support/OpenTS/Debug` instead. The file is named for the local time the process started:
 
 ```
 Debug/DEBUG_17-08-2026_06-00-35.LOG
@@ -24,7 +25,7 @@ Debug/DEBUG_17-08-2026_06-00-35.LOG
 
 Because each run gets its own file, the log from a run that crashed is still there after the next launch. When two processes start within the same second, the second adds its process id to the name.
 
-The log stays beside the executable when [`-USERDIR`](/using/command-line/#user-directory) names a user directory, so the game needs write access to the executable's directory to keep a log. If the folder or the file cannot be created, the game still runs, and its output still reaches the console and an attached debugger.
+On Windows, and for a plain macOS executable, the log stays beside the executable when [`-USERDIR`](/using/command-line/#user-directory) names a user directory, so the game needs write access to the executable's directory to keep a log. A macOS application bundle always writes its log to `~/Library/Application Support/OpenTS/Debug`. If the folder or the file cannot be created, the game still runs, and its output still reaches the console and an attached debugger.
 
 At startup, the game deletes logs last written more than 14 days ago. A single log stops growing at 64 MB, and its last line then says that the size limit was reached.
 

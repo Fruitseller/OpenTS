@@ -12,6 +12,7 @@
 #include "win.h"
 #include "dbgprint.h"
 #include "except.h"
+#include "macbundle.h"
 
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -85,10 +86,16 @@ void Fault()
 
 void Install_Exception_Handler()
 {
-	char executable[PROC_PIDPATHINFO_MAXSIZE] = {};
-	std::filesystem::path directory = ".";
-	if (proc_pidpath(getpid(), executable, sizeof(executable)) > 0) {
-		directory = std::filesystem::path(executable).parent_path();
+	std::filesystem::path directory;
+	if (OpenTSMacOS::Executable_Is_Bundled()) {
+		// A crash report must not land in the bundle, whose contents the player does not own.
+		directory = OpenTSMacOS::User_Data_Directory();
+	} else {
+		directory = ".";
+		char executable[PROC_PIDPATHINFO_MAXSIZE] = {};
+		if (proc_pidpath(getpid(), executable, sizeof(executable)) > 0) {
+			directory = std::filesystem::path(executable).parent_path();
+		}
 	}
 	std::error_code error;
 	directory /= "Crash";
