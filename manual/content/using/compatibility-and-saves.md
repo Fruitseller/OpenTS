@@ -18,4 +18,6 @@ A build lists and loads only saves written by the same OpenTS version. Every sav
 
 - The Win32 and x64 builds share the stamp. Load a save with the platform that wrote it, and play a network game with every player on the same platform; a mixed network game can go out of sync.
 
+The save list shows each save's file date and time in the local time zone, newest first. Windows formats both with the regional settings; macOS writes the date as `YYYY-MM-DD` and the time as a 24-hour `HH:MM`.
+
 Saving and loading on macOS has not received runtime verification.

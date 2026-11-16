@@ -1168,13 +1168,28 @@ inline BOOL FileTimeToSystemTime(FILETIME const * time, SYSTEMTIME * result)
 	return(TRUE);
 }
 
+/// <summary>
+/// Shifts a UTC file time to the local time of that instant, the offset including any
+/// daylight saving time in effect then. The result is a file time a later
+/// FileTimeToSystemTime call reads as the local wall clock.
+/// </summary>
 inline BOOL FileTimeToLocalFileTime(FILETIME const * source, FILETIME * destination)
 {
 	if (!source || !destination) return(FALSE);
-	*destination = *source;
+	std::time_t const seconds = OpenTSMacOSUnixTime(*source);
+	std::tm local = {};
+	if (!localtime_r(&seconds, &local)) return(FALSE);
+
+	std::int64_t const offset = static_cast<std::int64_t>(local.tm_gmtoff) * 10000000LL;
+	std::int64_t const stamp = static_cast<std::int64_t>(static_cast<ULONGLONG>(source->dwLowDateTime)
+		| (static_cast<ULONGLONG>(source->dwHighDateTime) << 32)) + offset;
+	ULONGLONG const shifted = static_cast<ULONGLONG>(stamp);
+	*destination = FILETIME{static_cast<DWORD>(shifted), static_cast<DWORD>(shifted >> 32)};
 	return(TRUE);
 }
 
+// Both readers use a fixed pattern: the user's regional format needs CoreFoundation's date
+// formatter, and the C locale that strftime reads is never set to the user's.
 inline int GetDateFormat(LCID, DWORD, SYSTEMTIME const * time, LPCSTR, LPSTR buffer, int size)
 {
 	if (!time || !buffer || size <= 0) return(0);
