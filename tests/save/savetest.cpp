@@ -2,8 +2,8 @@
 // the compressed content block, and every way the reader refuses a file that is not a
 // whole, intact save of a version it knows.
 //
-// Every file it touches it creates itself, in the working directory, so it reads no game data,
-// and each case deletes what it wrote.
+// Every file it touches it creates itself, in a scratch directory of its own, so it reads no
+// game data, and each case deletes what it wrote.
 
 #include "savefile.h"
 
@@ -152,7 +152,12 @@ struct SaveFixture
 	SaveFixture(void)
 	{
 		REQUIRE(lzo_init() == LZO_E_OK);
-		Scratch = ".";
+
+		// CTest runs each case as its own process, possibly in parallel, so each needs its own directory.
+		char temp[MAX_PATH];
+		GetTempPathA(sizeof(temp), temp);
+		Scratch = std::string(temp) + "opents-save-" + std::to_string(GetCurrentProcessId());
+		CreateDirectoryA(Scratch.c_str(), NULL);
 	}
 
 	~SaveFixture(void)
@@ -160,6 +165,7 @@ struct SaveFixture
 		for (char const * name : ScratchFiles) {
 			DeleteFileA(Scratch_Path(name).c_str());
 		}
+		RemoveDirectoryA(Scratch.c_str());
 	}
 };
 

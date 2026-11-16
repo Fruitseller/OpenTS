@@ -1386,6 +1386,7 @@ inline void GetSystemTimeAsFileTime(FILETIME * result)
 #define CreateFileA CreateFile
 #define GetFileAttributesA GetFileAttributes
 #define CreateDirectoryA CreateDirectory
+#define RemoveDirectoryA RemoveDirectory
 #define SetCurrentDirectoryA SetCurrentDirectory
 #define GetCurrentDirectoryA GetCurrentDirectory
 #define GetTempPathA GetTempPath
