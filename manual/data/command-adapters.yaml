@@ -402,7 +402,9 @@ fixed_exclusions:
       - { file: code/sdl/sdlkeys.cpp, function: Virtual_Key_Name, expression: VK_SHIFT }
       - { file: code/sdl/sdlkeys.cpp, function: Virtual_Key_Name, expression: VK_CONTROL }
       - { file: code/sdl/sdlkeys.cpp, function: Virtual_Key_Name, expression: VK_MENU }
-    reason: Converts modifier virtual keys to display names; it does not consume input.
+      - { file: code/sdl/sdlkeys.cpp, function: Virtual_Key_Name, expression: VK_LWIN, guard: OPENTS_MACOS }
+      - { file: code/sdl/sdlkeys.cpp, function: Virtual_Key_Name, expression: VK_RWIN, guard: OPENTS_MACOS }
+    reason: Converts virtual keys to display names; it does not consume input.
   - sites:
       - { file: code/list.cpp, function: ListClass::Action, expression: KN_UP }
       - { file: code/list.cpp, function: ListClass::Action, expression: KN_DOWN }

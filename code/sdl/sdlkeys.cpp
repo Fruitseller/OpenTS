@@ -153,8 +153,15 @@ int Position_Key(SDL_Scancode scancode)
 		case SDL_SCANCODE_RSHIFT:			return(VK_SHIFT);
 		case SDL_SCANCODE_LALT:
 		case SDL_SCANCODE_RALT:				return(VK_MENU);
+#ifdef OPENTS_MACOS
+		// A Mac keyboard has Command where the other platforms have the Windows key, and
+		// Command enters the game as Control.
+		case SDL_SCANCODE_LGUI:
+		case SDL_SCANCODE_RGUI:				return(VK_CONTROL);
+#else
 		case SDL_SCANCODE_LGUI:				return(VK_LWIN);
 		case SDL_SCANCODE_RGUI:				return(VK_RWIN);
+#endif
 		default:							return(0);
 	}
 }
@@ -218,6 +225,15 @@ std::string Virtual_Key_Name(int virtualkey, HKL layout)
 		case VK_MENU:		return("Alt");
 		default:			break;
 	}
+
+#ifdef OPENTS_MACOS
+	// Command reports as Control, so a binding saved for a Windows key has no scan code left
+	// to be named from and takes SDL's own name for the key.
+	if (virtualkey == VK_LWIN || virtualkey == VK_RWIN) {
+		char const * name = SDL_GetKeyName(virtualkey == VK_LWIN ? SDLK_LGUI : SDLK_RGUI);
+		return((name != nullptr) ? name : "");
+	}
+#endif
 
 	int const scancode = Scancode_Of(virtualkey);
 	if (scancode == SDL_SCANCODE_UNKNOWN || Layout_Position((SDL_Scancode)scancode)) {

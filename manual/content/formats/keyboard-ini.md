@@ -20,6 +20,8 @@ ToggleRepair=338    ; R with Shift
 ScatterObject=88    ; X
 ```
 
+On macOS, the Command key reports the Control code, so a binding stored for Control also runs when Command is pressed, and the keyboard dialog shows it as Ctrl. The Control key itself keeps working.
+
 A command name can appear only once in the section, so the file gives each command at most one key. If a name is repeated, the later value is used.
 
 The game reads the file at startup. A loose `KEYBOARD.INI` in the game directory replaces one inside an archive. An entry is ignored if its command name is not registered or its value is `0`. A key holds one command: when two entries give the same key, the earlier entry in the file keeps it and the later one is ignored.

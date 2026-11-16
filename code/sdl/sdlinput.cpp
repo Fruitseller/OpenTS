@@ -31,6 +31,10 @@ int Side_Key(int scancode)
 		case SDL_SCANCODE_RCTRL:	return(VK_RCONTROL);
 		case SDL_SCANCODE_LALT:		return(VK_LMENU);
 		case SDL_SCANCODE_RALT:		return(VK_RMENU);
+#ifdef OPENTS_MACOS
+		case SDL_SCANCODE_LGUI:		return(VK_LCONTROL);
+		case SDL_SCANCODE_RGUI:		return(VK_RCONTROL);
+#endif
 		default:					return(0);
 	}
 }
