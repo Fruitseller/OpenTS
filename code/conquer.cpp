@@ -376,6 +376,9 @@ void Main_Game(int argc, char * argv[])
 	*/
 	while (Select_Game(fade)) {
 		DebugString("Main_Game: Select_Game returned true, entering scenario\n");
+
+		// A close request made while the scenario loaded does not carry into the scenario.
+		QuitRequested = false;
 		fade = false;
 		ScenarioInit = 0;		// Kludge.
 		fade = true;

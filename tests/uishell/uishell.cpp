@@ -5800,6 +5800,30 @@ TEST_CASE("the shell runs modal screens over its host, routes their input, and s
 	}
 
 	{
+		UIVersionPresenterClass outer({ "outer" });
+		std::unique_ptr<UIViewClass> outerview = UI_Version_View(outer);
+		std::optional<UIResult> inner;
+		bool requested = false;
+		UIResult result = shell.Run_Modal(*outerview, [&](void) {
+			if (!requested) {
+				requested = true;
+				UIMessageBoxPresenterClass presenter("inner", { "OK" }, 0);
+				std::unique_ptr<UIViewClass> view = UI_Message_Box_View(presenter);
+				inner = shell.Run_Modal(*view, [&](void) {
+					shell.Cancel_Modal();
+					return(false);
+				});
+				return(false);
+			}
+			return(false);
+		});
+		REQUIRE_MESSAGE(inner.has_value(), "a close request cancels the screens that are up");
+		CHECK_MESSAGE(*inner == UI_RESULT_CANCELLED, "a close request cancels the screens that are up");
+		CHECK_MESSAGE(result == UI_RESULT_CANCELLED, "and the screen below it");
+		CHECK_MESSAGE(!shell.Screen_Shown(), "and leaves nothing shown");
+	}
+
+	{
 		UIVersionPresenterClass presenter({ "resize" });
 		std::unique_ptr<UIViewClass> view = UI_Version_View(presenter);
 		int passes = 0;

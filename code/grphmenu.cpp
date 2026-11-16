@@ -183,7 +183,8 @@ int GraphicMenu::Presentation(void)
 	Engine.Restore_Anims(AlternateSurface->Get_Rect());
 	Engine.Restore_And_Advance();
 
-	while (!done) {
+	// A close request leaves with no item chosen, so the caller can exit the game.
+	while (!done && !QuitRequested) {
 		Engine.Wait_For_Focus();
 
 		Point2D mouse(Get_Mouse_X(), Get_Mouse_Y());

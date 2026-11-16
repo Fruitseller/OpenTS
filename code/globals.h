@@ -223,6 +223,7 @@ extern int							SidebarRedraws;
 //extern DMonoType					MonoPage;
 extern bool							GameActive;
 extern bool							GameLoopActive;
+extern bool							QuitRequested;
 extern bool							SpecialFlag;
 extern int							ScenarioInit;
 extern HouseClass *					PlayerPtr;

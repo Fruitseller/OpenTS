@@ -14,6 +14,7 @@
 #include "_pk.h"
 #include "addon.h"
 #include "ccfile.h"
+#include "globals.h"
 #include "grphmenu.h"
 #include "init.h"
 #include "loaddlg.h"
@@ -98,6 +99,10 @@ __forceinline int NewMenuClass::Game_Select_Loop(NewMenuClass * menu)
 	int item = 0;
 
 	while (true) {
+		if (QuitRequested) {
+			return(NSEL_EXIT);
+		}
+
 		switch (menu->GameMode) {
 			default:
 				if (Addon_Installed(ADDON_FIRESTORM)) {

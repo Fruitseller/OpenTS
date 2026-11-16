@@ -52,4 +52,10 @@ A match in which every seat is an [observer](/systems/observers/) never has a pe
 
 ## The close button
 
-During a game, the window's close button and Alt+F4 quit the same way as Abort in the options menu. In a network game the other players are told the player left, and the departure then follows the rules above. Outside a game, and while a recorded game plays back, the close button does nothing.
+During a game, the window's close button and Alt+F4 quit the same way as Abort in the options menu. On macOS, Command-Q does the same. In a network game the other players are told the player left, and the departure then follows the rules above.
+
+On macOS, closing the window or pressing Command-Q outside a game ends the program the way Exit Game on the main menu does, after closing any open screen. The other platforms ignore a close request outside a game.
+
+While a recorded game plays back, a close request does nothing on every platform. One that arrives while a movie plays takes effect when the movie ends.
+
+On macOS, a close request that arrives while a save loads waits for the load: if the load fails, the program exits, and if it succeeds, the scenario starts and the request is dropped.

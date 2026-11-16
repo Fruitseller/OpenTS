@@ -48,6 +48,7 @@ class UIShellClass
 
 		bool Screen_Shown(void) const;
 		void Serve_Shown_Screen(void);
+		void Cancel_Modal(void);
 		UIResult Run_Modal(UIViewClass & view, UIServiceCallback const & service, bool hideparent = false);
 		UIServiceCallback const * Running_Service(void) const;
 		bool Show_Modeless(UIViewClass & view, bool reveal = false);
@@ -87,6 +88,7 @@ class UIShellClass
 
 		void Log(char const * format, ...);
 		void Report_Open_Error(UIViewClass const & view, char const * reason);
+		void Cancel_Top_Modal(void);
 		bool Active(void) const;
 		bool Documents_Visible(void) const;
 		bool Text_Input_Focused(void) const;
@@ -140,6 +142,8 @@ class UIShellClass
 		std::vector<UIViewClass *> Modals;
 		std::vector<UIServiceCallback const *> Services;
 		bool ModalClosing = false;
+		// Set while a close request unwinds the screens that are up, rather than just the top.
+		bool Cancelling = false;
 		std::vector<UIViewClass *> Modeless;
 
 		float RevealShown = 0.0f;

@@ -960,6 +960,12 @@ restart:
 
 		while (process) {
 
+			// A window closed from the menus leaves through the menu's own exit.
+			if (QuitRequested) {
+				QuitRequested = false;
+				selection = SEL_EXIT;
+			}
+
 			/*
 			**	Display menu and fetch selection from player.
 			*/

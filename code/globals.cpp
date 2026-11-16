@@ -336,6 +336,9 @@ bool GameActive;
 // no frames.
 bool GameLoopActive = false;
 
+// Set by a close request outside a scenario, which leaves through the main menu's exit.
+bool QuitRequested = false;
+
 
 /***************************************************************************
 **	This is a scratch variable that is used to when a reference is needed to

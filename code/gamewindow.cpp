@@ -194,12 +194,19 @@ static bool Handle_Event(WindowEvent const & event)
 			}
 			break;
 
-		// A running game resigns through the queue and then ends itself; otherwise the request
-		// is ignored.
+		// A running game resigns through the queue and then ends itself. Outside one, Windows
+		// ignores the request; macOS leaves through the menu's Exit Game entry after closing
+		// any screen that is up.
 		case WINDOW_EVENT_CLOSE_REQUESTED:
 			if (GameActive && PlayerPtr != NULL && !Session.Play) {
 				Queue_Exit();
 			}
+#ifdef OPENTS_MACOS
+			else if (PlayerPtr == NULL || !GameActive) {
+				QuitRequested = true;
+				UIShell.Cancel_Modal();
+			}
+#endif
 			break;
 
 		default:

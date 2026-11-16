@@ -546,6 +546,7 @@ void UIShellClass::Shutdown(void)
 	Modals.clear();
 	Services.clear();
 	ModalClosing = false;
+	Cancelling = false;
 
 	if (Input.Gesture_Owner() != UI_INPUT_NONE) {
 		Drop_Presses();
@@ -584,6 +585,34 @@ bool UIShellClass::Screen_Shown(void) const
 UIViewClass * UIShellClass::Modal(void) const
 {
 	return(Modals.empty() ? nullptr : Modals.back());
+}
+
+
+/// <summary>
+/// Closes the screens that are up, as Escape closes the top one, and keeps closing each one
+/// uncovered, so a confirmation box does not keep the player in the menus.
+/// </summary>
+void UIShellClass::Cancel_Modal(void)
+{
+	if (!Ready) {
+		return;
+	}
+
+	Cancelling = true;
+	Cancel_Top_Modal();
+}
+
+
+void UIShellClass::Cancel_Top_Modal(void)
+{
+	if (Modals.empty()) {
+		Cancelling = false;
+		return;
+	}
+
+	UIIntent intent;
+	intent.Name = "cancel";
+	Modals.back()->Presenter().Queue(intent);
 }
 
 
@@ -1040,6 +1069,10 @@ UIResult UIShellClass::Run_Modal(UIViewClass & view, UIServiceCallback const & s
 	UIResult result = UI_RESULT_SESSION_ENDED;
 
 	while (true) {
+		if (Cancelling) {
+			Cancel_Top_Modal();
+		}
+
 		bool ended = service();
 		if (!Ready) {
 			break;
@@ -1083,6 +1116,9 @@ UIResult UIShellClass::Run_Modal(UIViewClass & view, UIServiceCallback const & s
 	if (!Modals.empty() && Modals.back() == &view) {
 		Modals.pop_back();
 		Services.pop_back();
+	}
+	if (Modals.empty()) {
+		Cancelling = false;
 	}
 
 	Revealing = false;
